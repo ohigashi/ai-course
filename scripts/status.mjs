@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { evaluate, createEnv, loadRules, sections, readRepoFile } from './check.mjs';
+import { evaluate, createEnv, loadRules, sections, readRepoFile, listFiles, parseSavings, urlOf } from './check.mjs';
 
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -41,8 +41,20 @@ const remaining = (member) => {
   return stage ? stage.missing : [];
 };
 
+function outcomeCell(member) {
+  const o = member.outcome;
+  if (!o) return '-';
+  const parts = [];
+  if (o.made?.length) parts.push(`作ったもの: ${o.made.map(escapeHtml).join('、')}`);
+  if (o.monthlySavedHours) parts.push(`減らした時間: 月 ${o.monthlySavedHours}時間`);
+  if (o.url) parts.push(`公開: ${escapeHtml(o.url)}`);
+  if (o.stepups) parts.push(`発展コース ${o.stepups}件`);
+  return parts.join('<br>') || '-';
+}
+
 export function renderPage(members) {
   const sorted = [...members].sort(byName);
+  const totalHours = Math.round(sorted.reduce((sum, m) => sum + (m.outcome?.monthlySavedHours ?? 0), 0) * 10) / 10;
   const counts = new Map();
   for (const m of sorted) counts.set(currentLabel(m), (counts.get(currentLabel(m)) ?? 0) + 1);
   const summary = [...counts].map(([label, n]) => `<tr><td>${escapeHtml(label)}</td><td class="n">${n}人</td></tr>`).join('');
@@ -51,6 +63,7 @@ export function renderPage(members) {
 <td>${escapeHtml(currentLabel(m))}</td>
 <td>${remaining(m).map(escapeHtml).join('<br>') || '-'}</td>
 <td>${m.problem ? escapeHtml(m.problem) : '-'}</td>
+<td>${outcomeCell(m)}</td>
 <td class="d">${m.result?.lastCommitDate ? escapeHtml(m.result.lastCommitDate.slice(0, 10)) : '-'}</td>
 </tr>`).join('\n');
   return `<!doctype html>
@@ -65,8 +78,10 @@ table{width:100%;border-collapse:collapse}th,td{padding:8px 12px 8px 0;border-bo
 <h1>チームの進捗</h1>
 <h2>段階ごとの人数</h2>
 <table><tbody>${summary}</tbody></table>
+<h2>減らした時間の月合計</h2>
+<p>${totalHours}時間(本人の記録による)</p>
 <h2>メンバー</h2>
-<table><thead><tr><th>名前</th><th>いまの段階</th><th>残っていること</th><th>選んだ課題</th><th>最終更新</th></tr></thead>
+<table><thead><tr><th>名前</th><th>いまの段階</th><th>残っていること</th><th>選んだ課題</th><th>成果</th><th>最終更新</th></tr></thead>
 <tbody>
 ${rows}
 </tbody></table>
@@ -97,7 +112,15 @@ function memberStatus(member, repos, rules, workDir) {
   const result = evaluate(dir, rules, createEnv(dir, { assumeInvited: true }));
   const text = readRepoFile(dir, 'docs/01-problem.md');
   const problem = text === null ? null : problemOf(text);
-  return { ...member, repo: repo.full_name, result, problem };
+  const log = readRepoFile(dir, 'docs/02-log.md');
+  const launch = readRepoFile(dir, 'docs/05-launch.md');
+  const outcome = {
+    made: [...listFiles(dir, 'work'), ...listFiles(dir, 'app')].slice(0, 8),
+    monthlySavedHours: log === null ? 0 : parseSavings(log)?.monthlySavedHours ?? 0,
+    url: launch === null ? null : urlOf(launch),
+    stepups: listFiles(dir, 'docs/stepups').length,
+  };
+  return { ...member, repo: repo.full_name, result, problem, outcome };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -76,3 +76,14 @@ test('メンバーは手元のファイルから読み、無ければ空にす�
   writeFileSync(join(dir, 'members.local.json'), '[{"github":"a","name":"A"}]');
   assert.deepEqual(loadMembers(dir), [{ github: 'a', name: 'A' }]);
 });
+
+test('成果: 作ったもの、減らした時間、公開URLと月の合計を示し、本人の記録と添える', () => {
+  const a = { ...member('中村', 'n', 1), outcome: { made: ['report.py'], monthlySavedHours: 6, url: 'https://example.com/<x>', stepups: 1 } };
+  const b = { ...member('鈴木', 's', 1), outcome: { made: [], monthlySavedHours: 2.5, url: null, stepups: 0 } };
+  const html = renderPage([a, b]);
+  assert.ok(html.includes('report.py'));
+  assert.ok(html.includes('8.5時間'));
+  assert.ok(html.includes('本人の記録による'));
+  assert.ok(html.includes('https://example.com/&lt;x&gt;'));
+  assert.ok(html.includes('発展コース 1件'));
+});

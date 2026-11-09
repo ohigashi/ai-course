@@ -1,6 +1,6 @@
 // コースの完了条件を判定する。AI を使わず、リポジトリの中身だけで決める。
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync, lstatSync, realpathSync } from 'node:fs';
+import { readFileSync, existsSync, lstatSync, realpathSync, readdirSync } from 'node:fs';
 import { join, dirname, relative, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadRoadmap, renderRoadmap } from './roadmap.mjs';
@@ -62,6 +62,44 @@ function checkTimedItems(repoDir, check) {
   return count >= check.min ? [] : [`${check.label}(いま ${count} 件)`];
 }
 
+const PLACEHOLDER_FILES = new Set(['.gitkeep', 'README.md']);
+
+export function listFiles(repoDir, dir) {
+  const full = join(repoDir, dir);
+  if (!existsSync(full) || !lstatSync(full).isDirectory()) return [];
+  return readdirSync(full, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile() && !PLACEHOLDER_FILES.has(e.name) && !`${e.parentPath}`.includes('node_modules'))
+    .map((e) => e.name);
+}
+
+function minutesOf(label, text) {
+  const match = toHalfWidthDigits(text).match(new RegExp(`${label}\\s*[:：]\\s*([\\d.]+)\\s*(分|時間)`));
+  if (!match) return null;
+  return match[2] === '時間' ? Number(match[1]) * 60 : Number(match[1]);
+}
+
+export function parseSavings(text) {
+  const beforeMin = minutesOf('1回あたりの時間\\(前\\)', text);
+  const afterMin = minutesOf('1回あたりの時間\\(後\\)', text);
+  const count = toHalfWidthDigits(text).match(/月の回数\s*[:：]\s*(\d+)/);
+  if (beforeMin === null || afterMin === null || !count) return null;
+  const perMonth = Number(count[1]);
+  const saved = Math.max(0, beforeMin - afterMin) * perMonth;
+  return { beforeMin, afterMin, perMonth, monthlySavedHours: Math.round((saved / 60) * 10) / 10 };
+}
+
+export const urlOf = (text) => text.match(/https?:\/\/[^\s)>"'、。]+/)?.[0] ?? null;
+
+function checkUrl(repoDir, check, env) {
+  const text = readDoc(repoDir, check.path);
+  const url = text === null ? null : urlOf(text);
+  if (!url) return [check.label];
+  if (!env.http) return [];
+  const statuses = [...(env.http(url) ?? '').matchAll(/HTTP\/[\d.]+ (\d{3})/g)];
+  const last = statuses.at(-1)?.[1];
+  return last && /^[23]/.test(last) ? [] : [`${check.label}(URL に届きません)`];
+}
+
 function checkPushed(env, check) {
   if (env.git(['rev-parse', '@{u}']) === null) return [check.label];
   const status = env.git(['status', '--porcelain=v2', '--branch']) ?? '';
@@ -104,6 +142,14 @@ function runCheck(repoDir, check, env) {
       return checkPushed(env, check);
     case 'invited':
       return checkInvited(env, check);
+    case 'any_file':
+      return listFiles(repoDir, check.dir).length > 0 ? [] : [check.label];
+    case 'savings': {
+      const text = readDoc(repoDir, check.path);
+      return text !== null && parseSavings(text) ? [] : [check.label];
+    }
+    case 'url':
+      return checkUrl(repoDir, check, env);
     default:
       throw new Error(`unknown check type: ${check.type}`);
   }
@@ -130,6 +176,11 @@ export function claudeMdStatus(repoDir, env, now = new Date()) {
 export function reminderText(status) {
   if (!status.due) return '';
   return `CLAUDE.md を前回見直してから ${status.daysSince} 日、作業の保存が ${status.commitsSince} 回たまっています。受講者に最初の返答で、作業内容をもとに CLAUDE.md を見直せることを1文で伝え、/review-claude-md を案内してください。`;
+}
+
+export function updateReminderText(output) {
+  if (!output?.includes('更新があります')) return '';
+  return 'コースの教材に更新があります。受講者に最初の返答で1文で伝え、/next で内容を確かめて取り込めることを案内してください。';
 }
 
 export function evaluate(repoDir, rules, env) {
@@ -165,7 +216,8 @@ export function loadRules() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const repoDir = dirname(dirname(fileURLToPath(import.meta.url)));
-  const env = createEnv(repoDir, { assumeInvited: process.argv.includes('--assume-invited') });
+  const http = (url) => run('curl', ['-sIL', '--max-time', '8', url], repoDir);
+  const env = createEnv(repoDir, { assumeInvited: process.argv.includes('--assume-invited'), http });
   const result = evaluate(repoDir, loadRules(), env);
   process.stdout.write(`${JSON.stringify({ ...result, roadmap: renderRoadmap(result, loadRoadmap()) }, null, 2)}\n`);
 }

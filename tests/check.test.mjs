@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { evaluate, readRepoFile, claudeMdStatus, reminderText } from '../scripts/check.mjs';
+import { evaluate, readRepoFile, claudeMdStatus, reminderText, parseSavings, updateReminderText } from '../scripts/check.mjs';
 
 const noRemote = { git: () => null, gh: () => null };
 
@@ -203,4 +203,41 @@ test('claudeMdStatus: 教材の更新は作業の回数に入れない', () => {
 test('reminderText: 時期なら案内を返し、そうでなければ空', () => {
   assert.ok(reminderText({ due: true, daysSince: 21, commitsSince: 3 }).includes('/review-claude-md'));
   assert.equal(reminderText({ due: false }), '');
+});
+
+test('any_file: 中身のあるファイルが1つあれば完了し、目印だけでは未完了', () => {
+  const rules = [stage(2, [{ type: 'any_file', dir: 'work', label: 'work に作る' }])];
+  assert.equal(evaluate(repo({}), rules, noRemote).stages[0].done, false);
+  assert.equal(evaluate(repo({ 'work/.gitkeep': '' }), rules, noRemote).stages[0].done, false);
+  assert.equal(evaluate(repo({ 'work/sub/a.py': 'x' }), rules, noRemote).stages[0].done, true);
+});
+
+const savingsText = '1回あたりの時間(前): 2時間\n1回あたりの時間(後): 30分\n月の回数: ４回\n';
+
+test('parseSavings: 前後の時間と月の回数から月の削減時間を計算する', () => {
+  assert.deepEqual(parseSavings(savingsText), { beforeMin: 120, afterMin: 30, perMonth: 4, monthlySavedHours: 6 });
+  assert.equal(parseSavings('1回あたりの時間(前): 分\n'), null);
+  assert.equal(parseSavings('1回あたりの時間(前): 10分\n1回あたりの時間(後): 20分\n月の回数: 1回\n').monthlySavedHours, 0);
+});
+
+test('savings: 記録がそろっていれば完了', () => {
+  const rules = [stage(2, [{ type: 'savings', path: 'l.md', label: '時間を記録する' }])];
+  assert.equal(evaluate(repo({ 'l.md': savingsText }), rules, noRemote).stages[0].done, true);
+  assert.equal(evaluate(repo({ 'l.md': '記録なし' }), rules, noRemote).stages[0].done, false);
+});
+
+test('url: URL が必要で、http が使えるときは応答も確かめ、使えないときは URL の有無だけを見る', () => {
+  const rules = [stage(5, [{ type: 'url', path: 'u.md', label: '公開URLを書く' }])];
+  const dir = repo({ 'u.md': '公開先: https://example.com/app\n' });
+  assert.equal(evaluate(repo({ 'u.md': 'まだです' }), rules, noRemote).stages[0].done, false);
+  assert.equal(evaluate(dir, rules, noRemote).stages[0].done, true);
+  assert.equal(evaluate(dir, rules, { ...noRemote, http: () => 'HTTP/2 200\n' }).stages[0].done, true);
+  assert.equal(evaluate(dir, rules, { ...noRemote, http: () => 'HTTP/2 301\nlocation: x\n\nHTTP/2 404\n' }).stages[0].done, false);
+  assert.equal(evaluate(dir, rules, { ...noRemote, http: () => null }).stages[0].done, false);
+});
+
+test('updateReminderText: 更新があれば案内し、無ければ空', () => {
+  assert.ok(updateReminderText('更新があります(版: abc)\nM\tcourse/stage-2.md\n').includes('/next'));
+  assert.equal(updateReminderText('コースは最新です。\n'), '');
+  assert.equal(updateReminderText(null), '');
 });

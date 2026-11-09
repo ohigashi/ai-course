@@ -53,5 +53,92 @@
         }
       }
     ]
+  },
+  {
+    "id": 2,
+    "title": "小さな自動化",
+    "checks": [
+      {
+        "type": "any_file",
+        "dir": "work",
+        "label": "work/ に作ったものを保存する"
+      },
+      {
+        "type": "savings",
+        "path": "docs/02-log.md",
+        "label": "docs/02-log.md に、かかった時間の前後と月の回数を書く"
+      },
+      {
+        "type": "headings",
+        "path": "docs/02-log.md",
+        "headings": [
+          "やったこと",
+          "結果"
+        ],
+        "minChars": 10,
+        "label": "docs/02-log.md に、やったことと結果を書く"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "title": "プロダクト化",
+    "checks": [
+      {
+        "type": "headings",
+        "path": "docs/03-spec.md",
+        "headings": [
+          "誰のためか",
+          "解く課題",
+          "最小の形",
+          "作らないもの",
+          "判断の基準"
+        ],
+        "minChars": 10,
+        "label": "docs/03-spec.md を書く"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "title": "アプリ開発",
+    "checks": [
+      {
+        "type": "any_file",
+        "dir": "app",
+        "label": "app/ にアプリのコードを置く"
+      },
+      {
+        "type": "headings",
+        "path": "docs/04-check.md",
+        "headings": [
+          "確かめたこと",
+          "結果"
+        ],
+        "minChars": 10,
+        "label": "docs/04-check.md に動作確認を書く"
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "title": "公開と運用",
+    "checks": [
+      {
+        "type": "url",
+        "path": "docs/05-launch.md",
+        "label": "docs/05-launch.md に公開URLを書く"
+      },
+      {
+        "type": "headings",
+        "path": "docs/05-launch.md",
+        "headings": [
+          "公開したもの",
+          "公開後に直したこと"
+        ],
+        "minChars": 10,
+        "label": "docs/05-launch.md に公開後の改善を書く"
+      }
+    ]
   }
 ]
