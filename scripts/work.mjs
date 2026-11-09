@@ -54,8 +54,8 @@ export function setWorkState(works, slug, state, today) {
 export function closeRound(works, slug, today) {
   mustFind(works, slug);
   const work = works.find((w) => w.slug === slug);
-  if (work.phase <= 2 && roundCount(work, work.phase) < 1) {
-    throw new Error(`フェーズ${work.phase}は、最初の1回の判定が通るまで一区切りにできません。/next で判定を進めてください。`);
+  if (work.phase <= 2 && !work.redo) {
+    throw new Error(`フェーズ${work.phase}の一区切りは、やり直しのときだけ付けられます。最初の1回は判定が通ると自動で記録されます。もう1回やるときは、先に /work で move <slug> ${work.phase} を実行して戻ってください。`);
   }
   return update(works, slug, today, (w) => ({ rounds: [...w.rounds, { phase: w.phase, date: today }], redo: false }));
 }
@@ -97,8 +97,8 @@ function main(args) {
   const needs = { move: 2, next: 2, pause: 1, resume: 1, round: 1 }[cmd];
   if (needs && rest.length < needs) fail(`${cmd} には ${needs === 2 ? '取り組みの slug と、続く値' : '取り組みの slug'} が必要です。${USAGE}`);
 
-  // 回数を記録する sync と round は、公開先に実際に届くかも確かめる。届かないのに記録が残らないように。
-  const makeEnv = cmd === 'sync' || cmd === 'round' ? createCliEnv : createEnv;
+  // 回数を記録する sync と round、works.json がまだ無くて既定の取り組みを作るときは、公開先に実際に届くかも確かめる。届かないのに記録が残らないように。
+  const makeEnv = cmd === 'sync' || cmd === 'round' || stored.length === 0 ? createCliEnv : createEnv;
   const evaluated = evaluate(repoDir, loadRules(), makeEnv(repoDir, { assumeInvited: true }));
   const current = stored.length ? stored : defaultWorks(evaluated, today);
   const save = (works) => writeFileSync(file, `${JSON.stringify({ items: works }, null, 2)}\n`);

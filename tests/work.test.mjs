@@ -56,13 +56,16 @@ test('closeRound: フェーズ3と4はいつでも1回足す', () => {
   assert.equal(roundCount(out[0], 3), 2);
   assert.equal(out[0].touchedAt, 'f');
 });
-test('closeRound: フェーズ1と2は判定が通った1回目のあとだけ足せる', () => {
+test('closeRound: フェーズ1と2は redo のときだけ足せる', () => {
   const w = addWork([], 'A', 1, 'd');
   assert.throws(() => closeRound(w, 'w1', 'e'));
   const passed = [{ ...w[0], rounds: [{ phase: 1, date: 'd' }] }];
-  assert.equal(roundCount(closeRound(passed, 'w1', 'e')[0], 1), 2);
-  const p2 = [{ ...w[0], phase: 2, rounds: [{ phase: 1, date: 'd' }] }];
+  assert.throws(() => closeRound(passed, 'w1', 'e'), /move/);
+  const redo = [{ ...passed[0], redo: true }];
+  assert.equal(roundCount(closeRound(redo, 'w1', 'e')[0], 1), 2);
+  const p2 = [{ ...w[0], phase: 2, rounds: [{ phase: 2, date: 'd' }] }];
   assert.throws(() => closeRound(p2, 'w1', 'e'));
+  assert.equal(roundCount(closeRound([{ ...p2[0], redo: true }], 'w1', 'e')[0], 2), 2);
 });
 test('純粋関数は元の配列を書き換えない', () => {
   const w = addWork([], 'A', 1, 'd');
@@ -164,8 +167,16 @@ test('CLI: 判定が通って回数が未保存でも、round は1回目を記�
   assert.equal(first.status, 0, first.stdout);
   assert.equal(roundCount(readWorks(dir).find((w) => w.slug === 'w1'), 1), 1);
   const second = cli(dir, 'round', 'w1');
-  assert.equal(second.status, 0, second.stdout);
-  assert.equal(roundCount(readWorks(dir).find((w) => w.slug === 'w1'), 1), 2);
+  assert.notEqual(second.status, 0, second.stdout);
+  assert.match(second.stdout, /move/);
+  assert.equal(roundCount(readWorks(dir).find((w) => w.slug === 'w1'), 1), 1);
+  assert.equal(cli(dir, 'move', 'w1', '1').status, 0);
+  assert.equal(readWorks(dir).find((w) => w.slug === 'w1').redo, true);
+  const third = cli(dir, 'round', 'w1');
+  assert.equal(third.status, 0, third.stdout);
+  const w = readWorks(dir).find((x) => x.slug === 'w1');
+  assert.equal(roundCount(w, 1), 2);
+  assert.equal(w.redo, false);
 });
 test('CLI: next に文章がなければ止まり、書き換えない', () => {
   const dir = tmpRepo();
@@ -215,4 +226,22 @@ test('CLI: sync は公開先に届かないフェーズ2を記録しない(届�
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const rounds = readWorks(dir)[0].rounds;
   assert.deepEqual(rounds.map((x) => x.phase), [1]);
+});
+
+test('CLI: works.json が無い人の next でも、既定の取り組みに届かない公開先のフェーズ2を残さない', () => {
+  const dir = tmpRepo();
+  const long = '内容を十分な長さで書いた文章です。';
+  const put = (path, body) => { mkdirSync(dirname(join(dir, path)), { recursive: true }); writeFileSync(join(dir, path), body); };
+  put('work/a.txt', 'x'); put('app/a.txt', 'x');
+  put('docs/01-tasks.md', '- 集計 2時間\n- 請求 30分\n- 議事録 1時間\n');
+  put('docs/01-problem.md', ['誰の', '何が困っているか', 'いまどうしているか', 'どうなればよいか'].map((h) => `## ${h}\n${long}\n`).join(''));
+  put('docs/02-log.md', `1回あたりの時間(前): 60分\n1回あたりの時間(後): 10分\n月の回数: 4\n## やったこと\n${long}\n## 結果\n${long}\n`);
+  put('docs/03-spec.md', ['誰のためか', '解く課題', '最小の形', '作らないもの', '判断の基準'].map((h) => `## ${h}\n${long}\n`).join(''));
+  put('docs/04-check.md', `## 確かめたこと\n${long}\n## 結果\n${long}\n`);
+  put('docs/05-launch.md', `http://127.0.0.1:1/app\n## 公開したもの\n${long}\n## 公開後に直したこと\n${long}\n`);
+  const r = cli(dir, 'next', 'main', '見直す');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const rounds = readWorks(dir)[0].rounds;
+  assert.deepEqual(rounds.map((x) => x.phase), [1]);
+  assert.equal(readWorks(dir)[0].phase, 2);
 });
