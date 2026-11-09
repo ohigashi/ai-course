@@ -18,3 +18,7 @@ test('活用日数は大東に見えるとは書かない', () => {
     assert.ok(!t.includes('活用した日付と日数も大東に見えます'), f);
   }
 });
+
+test('README のフェーズ名は「」で区切り、名前の中の読点と混ざらない', () => {
+  assert.ok(readFileSync(join(root, 'README.md'), 'utf8').includes('「繰り返して慣れる、たくさん作る」'));
+});
