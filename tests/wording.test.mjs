@@ -60,8 +60,10 @@ test('発展コースに時期の条件の列がない', () => {
   assert.ok(!read('course/stepups/index.md').includes('始められる時期'));
 });
 
-test('changelog の先頭は複数の取り組みの項目', () => {
-  assert.ok(read('course/changelog.md').split('\n').find((l) => l.startsWith('## ')).includes('複数の取り組みを進められるようになりました'));
+test('changelog に複数の取り組みの項目があり、先頭は Web の項目', () => {
+  const headings = read('course/changelog.md').split('\n').filter((l) => l.startsWith('## '));
+  assert.ok(headings[0].includes('Webで見られるようになりました'));
+  assert.ok(headings.some((l) => l.includes('複数の取り組みを進められるようになりました')));
 });
 
 test('課題の洗い出しを終えることを条件にする文がない', () => {

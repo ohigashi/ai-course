@@ -2,7 +2,7 @@
 
 デスクトップアプリに慣れたら、ターミナルでも Claude Code を使えるようにします。自動で動かす仕組みや、アプリ開発の道具とつなげやすくなります。
 
-1. 手順のページ https://ohgs.dev/ai-course/terminal/ に沿って、Claude Code を入れます
+1. 手順のページ https://ac.hyperdash.app/terminal に沿って、Claude Code を入れます
 2. アプリの中のターミナルの窓(Ctrl + バッククォート)で、`cd`、`ls`(Windows は `dir` でも可)を試し、フォルダの移動に慣れます
 3. 自分のフォルダで `claude` と入力して開き、`/next` を実行します。アプリと同じ続きから進められます
 4. ターミナルでは、画面の下にコースの現在地が表示されます

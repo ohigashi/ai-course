@@ -66,7 +66,7 @@ description: コースのいまの位置と、次にやることを受講者に�
 
 ## 使い方を聞かれたら
 
-コースの進め方を聞かれたら、使い方ガイド https://ohgs.dev/ai-course/guide/ を案内する。
+コースの進め方を聞かれたら、使い方ガイド https://ac.hyperdash.app/guide を案内する。
 
 ## 助言の決まり
 
