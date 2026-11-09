@@ -2,6 +2,8 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { ensureLocalExcluded } from './local-dir.mjs';
+import { todayString } from './activity.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const REQUIRED_PER_LEVEL = 2;
@@ -46,12 +48,22 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const [command, id] = process.argv.slice(2);
   const catalog = loadCatalog();
   const completed = parseCompleted(existsSync(RECORD_FILE) ? readFileSync(RECORD_FILE, 'utf8') : null);
+  try {
+    ensureLocalExcluded();
+  } catch {
+    // git が使えないときは、スキル側で .local に書かない
+  }
+  if (command === 'check') {
+    if (canStart(id, completed, catalog)) process.exit(0);
+    console.log('この課題は、いまのレベルの課題ではありません。`node scripts/challenge.mjs status` で選べる課題を確かめてください。');
+    process.exit(1);
+  }
   if (command === 'complete') {
     if (!canStart(id, completed, catalog)) {
       console.log('この課題はまだ記録できません。いまのレベルの課題か、課題の名前を確かめてください。');
       process.exit(1);
     }
-    const today = new Date().toLocaleDateString('sv');
+    const today = todayString();
     writeFileSync(RECORD_FILE, `${JSON.stringify({ completed: recordCompletion(completed, id, today, catalog) }, null, 2)}\n`);
     console.log('課題の完了を記録しました。評価の中身は記録していません。');
   } else {

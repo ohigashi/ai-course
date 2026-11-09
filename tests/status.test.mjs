@@ -220,8 +220,9 @@ test('TEAM.md: 「継続される」は活用量が分かるので、チーム�
 });
 
 test('TEAM.md: 了承者の節目の日付を載せ、活用の推移は載せない', () => {
-  const a = { ...member('中村', 'n', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, milestones: [{ key: 'level:1', date: '2026-11-10' }, { key: 'phase:継続される', date: '2026-11-11' }], months: [{ month: '2026-11', days: 12 }] };
+  const a = { ...member('中村', 'n', 1), share: shareOf({ milestones: true }), outcome: { made: [], monthlySavedHours: 0 }, milestones: [{ key: 'level:1', date: '2026-11-10' }, { key: 'phase:継続される', date: '2026-11-11' }], months: [{ month: '2026-11', days: 12 }] };
   const md = renderTeamMd([a]);
+  assert.ok(!renderTeamMd([{ ...a, share: shareOf() }]).includes('2026-11-10'));
   assert.ok(md.includes('2026-11-10') && md.includes('課題解決 レベル1'));
   assert.ok(!md.includes('継続される') && !md.includes('2026-11-11'));
   assert.ok(!md.includes('12日'));
@@ -232,4 +233,14 @@ test('運営のページ: 節目と月ごとの活用の推移を示す', () => 
   const html = renderPage([a]);
   assert.ok(html.includes('2026-11-09'));
   assert.ok(html.includes('2026-11: 12日'));
+});
+
+test('parseShare: 節目の掲載は明示の了承だけ', () => {
+  assert.equal(parseShare('{"share":true}').milestones, false);
+  assert.equal(parseShare('{"share":true,"milestones":true}').milestones, true);
+});
+
+test('運営のページ: 作ったものと減らした時間の変化を示す', () => {
+  const a = { ...member('中村', 'n', 1), outcome: { made: [], monthlySavedHours: 0 }, snapshots: [{ month: '2026-11', made: 3, savedHours: 6 }] };
+  assert.ok(renderPage([a]).includes('作ったもの 3件'));
 });

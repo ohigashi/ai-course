@@ -5,7 +5,7 @@ description: 課題解決コースの提出物を、できたものとプロセ�
 
 # /challenge-submit
 
-1. どの課題の提出かを確かめ、`course/challenges/rubric.md`、課題のファイル、`challenges/<id>/`、`.local/challenges/<id>/process.md` を読む
+1. どの課題の提出かを確かめ、`node scripts/challenge.mjs check <id>` を実行する。止まったら、表示された理由と選べる課題を伝えて終える。続けて `course/challenges/rubric.md`、課題のファイル、`challenges/<id>/`、`.local/challenges/<id>/process.md` を読む
 2. 課題のレベルに合わせて、「できたもの」と「プロセス」を別々に評価する。観点ごとに「できている」「もう少し」「これから」と、根拠を一文で示す。点数は付けない
 3. できている点から返し、次に伸ばす点を1つ、具体的な次の一手と一緒に伝える。うまくいかなかった試みを減点しない。人と比べない
 4. 過程の記録が足りないときは、評価の前に問いかけて補う。受講者の代わりに書かない

@@ -168,3 +168,20 @@ test('--apply でも .local を除外する', () => {
   run(learner, upstream, `--apply=${shaOf(run(learner, upstream).stdout)}`);
   assert.ok(readFileSync(join(learner, '.git/info/exclude'), 'utf8').includes('.local/'));
 });
+
+const challenge = join(root, 'scripts', 'challenge.mjs');
+
+test('challenge.mjs status: .local を除外する', () => {
+  const { learner } = setup();
+  assert.equal(spawnSync(process.execPath, [challenge, 'status'], { cwd: learner, encoding: 'utf8' }).status, 0);
+  assert.ok(readFileSync(join(learner, '.git/info/exclude'), 'utf8').includes('.local/'));
+});
+
+test('challenge.mjs check: 評価の前にいまのレベルかを確かめて理由を返す', () => {
+  const { learner } = setup();
+  const ok = spawnSync(process.execPath, [challenge, 'check', 'l1-message'], { cwd: learner, encoding: 'utf8' });
+  assert.equal(ok.status, 0);
+  const ng = spawnSync(process.execPath, [challenge, 'check', 'l5-giveaway'], { cwd: learner, encoding: 'utf8' });
+  assert.equal(ng.status, 1);
+  assert.ok(ng.stdout.includes('いまのレベル'));
+});

@@ -5,9 +5,9 @@ description: 課題解決とプロダクトコースの課題を選び、節目�
 
 # /challenge
 
-1. `node scripts/challenge.mjs status` で、いまのレベルと選べる課題を確かめる。`current` が null ならすべて終えたことを伝える
+1. `node scripts/check.mjs` の結果で段階2を終えていなければ、段階2のあとから始められることを伝えて終える。`node scripts/challenge.mjs status` で、いまのレベルと選べる課題を確かめる(`.local/` の除外もここで設定される)。`current` が null ならすべて終えたことを伝える
 2. 課題を受講者に選んでもらい、`course/challenges/` の該当ファイルを読んで示す
-3. 記録のファイル `.local/challenges/<課題の id>/process.md` を用意する。先に `node scripts/log.mjs` と同じ除外が効いていることを `git check-ignore .local/x` で確かめ、効いていなければ `.local/` に書かない
+3. 記録のファイル `.local/challenges/<課題の id>/process.md` を用意する。`git ls-files .local` に何か表示されたら、書かずに大東への相談を伝えて終える
 4. 次の節目ごとに短く問いかけ、受講者の答えを日付つきでそのまま追記する。代わりに考えて書かない
    - 取りかかる前: 誰の何を解くと捉えましたか。依頼の言葉と変えたところはありますか
    - 案を決めるとき: どんな案を考えましたか。なぜそれを選びますか。何を作らないと決めましたか

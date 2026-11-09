@@ -197,7 +197,7 @@ test('claudeMdStatus: 教材の更新は作業の回数に入れない', () => {
   const git = (args) => { calls.push(args); return claudeGit('2026-11-09T00:00:00+09:00', 1)(args); };
   claudeMdStatus(written(), { git, gh: () => null }, now);
   const revList = calls.find((a) => a[0] === 'rev-list');
-  for (const p of [':!course', ':!scripts', ':!.claude']) assert.ok(revList.includes(p));
+  for (const p of [':!course', ':!scripts', ':!.claude', ':!activity.json', ':!milestones.json', ':!challenges.json']) assert.ok(revList.includes(p));
 });
 
 test('reminderText: 時期なら案内を返し、そうでなければ空', () => {
@@ -282,4 +282,9 @@ test('.local の中身は未保存の作業に数えない', () => {
 test('challenge_levels: 課題解決のレベルをすべて終えたら完了', () => {
   const rules = [stage(7, [{ type: 'challenge_levels', label: 'レベルを終える' }])];
   assert.equal(evaluate(repo({}), rules, noRemote).stages[0].done, false);
+});
+
+test('取り組み中の課題の作りかけは未保存に数えない', () => {
+  const env = { git: (a) => (a[0] === 'status' ? '# branch.ab +0 -0\n? challenges/l1-message/a.md\n' : null), gh: () => null };
+  assert.equal(evaluate(repo({}), [], env).unsaved, false);
 });

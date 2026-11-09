@@ -117,7 +117,7 @@ function checkPushed(env, check) {
 function hasUnsavedWork(env) {
   const status = env.git(['status', '--porcelain=v2', '--branch']);
   if (status === null) return false;
-  return !/branch\.ab \+0 -0/.test(status) || ownChanges(status).length > 0;
+  return !/branch\.ab \+0 -0/.test(status) || ownChanges(status).some((path) => !path.startsWith('challenges/'));
 }
 
 function repoSlug(env) {
@@ -184,7 +184,7 @@ export function claudeMdStatus(repoDir, env, now = new Date()) {
   const last = env.git(['log', '-1', '--format=%H %cI', '--', 'CLAUDE.md'])?.trim();
   if (!last) return { due: false };
   const [sha, date] = last.split(' ');
-  const count = env.git(['rev-list', '--count', `${sha}..HEAD`, '--', '.', ':!course', ':!scripts', ':!.claude']);
+  const count = env.git(['rev-list', '--count', `${sha}..HEAD`, '--', '.', ':!course', ':!scripts', ':!.claude', ':!activity.json', ':!milestones.json', ':!challenges.json']);
   const commitsSince = Number(count) || 0;
   const daysSince = Math.floor((now - new Date(date)) / DAY_MS);
   const due = (daysSince >= REVIEW_AFTER_DAYS && commitsSince >= 1) || commitsSince >= REVIEW_AFTER_COMMITS;
@@ -230,6 +230,11 @@ export function createEnv(repoDir, options = {}) {
   };
 }
 
+// 手元の判定と歩みの記録で、同じ条件を使う。
+export function createCliEnv(repoDir, options = {}) {
+  return createEnv(repoDir, { ...options, http: (url) => run('curl', ['-sIL', '--max-time', '8', url], repoDir) });
+}
+
 export function loadConfig() {
   const root = dirname(dirname(fileURLToPath(import.meta.url)));
   return JSON.parse(readFileSync(join(root, 'course', 'config.json'), 'utf8'));
@@ -242,8 +247,7 @@ export function loadRules() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const repoDir = dirname(dirname(fileURLToPath(import.meta.url)));
-  const http = (url) => run('curl', ['-sIL', '--max-time', '8', url], repoDir);
-  const env = createEnv(repoDir, { assumeInvited: process.argv.includes('--assume-invited'), http });
+  const env = createCliEnv(repoDir, { assumeInvited: process.argv.includes('--assume-invited') });
   const result = evaluate(repoDir, loadRules(), env);
   process.stdout.write(`${JSON.stringify({ ...result, roadmap: renderRoadmap(result, loadRoadmap()) }, null, 2)}\n`);
 }

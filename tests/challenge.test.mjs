@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { levelProgress, recordCompletion, canStart, loadCatalog } from '../scripts/challenge.mjs';
-import { syncMilestones, renderTimeline, teamMilestones, monthlyActivity, parseMilestones } from '../scripts/history.mjs';
+import { syncMilestones, renderTimeline, teamMilestones, monthlyActivity, parseMilestones, syncSnapshots, parseSnapshots } from '../scripts/history.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -90,4 +90,25 @@ test('parseMilestones: 決まった形の節目だけを受け付け、件数に
   assert.deepEqual(parseMilestones(JSON.stringify({ events })).map((e) => e.key), ['stage:1', 'level:2', 'phase:試す']);
   const many = Array.from({ length: 1000 }, (_, i) => ({ key: `stage:${i}`, date: '2026-11-09' }));
   assert.equal(parseMilestones(JSON.stringify({ events: many })).length, 200);
+});
+
+test('syncMilestones: 「継続される」に達した日に、実装の節目も残す', () => {
+  const keys = syncMilestones([{ key: 'phase:慣れる', date: 'x' }], state({ phase: '継続される' }), '2026-11-20').map((e) => e.key);
+  assert.ok(keys.includes('phase:仕組みとして実装する'));
+  assert.ok(keys.includes('phase:継続される'));
+});
+
+test('syncSnapshots: 月ごとに1件で、同じ月は更新する', () => {
+  const one = syncSnapshots([], '2026-11', 1, 2);
+  assert.deepEqual(syncSnapshots(one, '2026-11', 3, 6), [{ month: '2026-11', made: 3, savedHours: 6 }]);
+  assert.equal(syncSnapshots(one, '2026-12', 3, 6).length, 2);
+});
+
+test('parseSnapshots: 形の正しいものだけを読む', () => {
+  const text = JSON.stringify({ snapshots: [{ month: '2026-11', made: 1, savedHours: 2 }, { month: 'x', made: 1, savedHours: 2 }, { month: '2026-12', made: 'a', savedHours: 2 }] });
+  assert.deepEqual(parseSnapshots(text), [{ month: '2026-11', made: 1, savedHours: 2 }]);
+});
+
+test('評価基準: レベル1は繰り返し使える観点を読み替える', () => {
+  assert.match(readFileSync(join(root, 'course/challenges/rubric.md'), 'utf8'), /レベル1では.*同じ手順でもう一度/);
 });

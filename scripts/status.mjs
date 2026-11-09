@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { parseMilestones, monthlyActivity, renderTimeline, teamMilestones } from './history.mjs';
+import { parseMilestones, parseSnapshots, monthlyActivity, renderTimeline, teamMilestones } from './history.mjs';
 import { loadRoadmap } from './roadmap.mjs';
 import { parseActivity } from './activity.mjs';
 import { evaluate, createEnv, loadRules, loadConfig, sections, readRepoFile, listFiles, parseSavings, urlOf } from './check.mjs';
@@ -48,7 +48,7 @@ export function parseShare(text) {
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
   const tips = Array.isArray(data.tips) ? data.tips.filter((t) => typeof t === 'string').map(shareText).filter(Boolean).slice(0, 5) : [];
-  return { share: data.share === true, project: data.project === true, problem: shareText(data.problem), made: shareText(data.made), tips, declined: data.share === false && data.project === false };
+  return { share: data.share === true, project: data.project === true, problem: shareText(data.problem), made: shareText(data.made), tips, milestones: data.milestones === true, declined: data.share === false && data.project === false };
 }
 
 export function teamInviteTargets(members, collaborators) {
@@ -90,7 +90,7 @@ export function renderTeamMd(members) {
     if (m.share.problem) lines.push(`- 取り組んでいる課題: ${m.share.problem}`);
     if (count || m.share.made) lines.push(`- 作ったもの: ${count}件${m.share.made ? `。${m.share.made}` : ''}`);
     if (m.outcome?.monthlySavedHours) lines.push(`- 減らした時間: 月 ${m.outcome.monthlySavedHours}時間`);
-    const steps = teamMilestones(m.milestones ?? []);
+    const steps = m.share.milestones ? teamMilestones(m.milestones ?? []) : [];
     if (steps.length) lines.push('- これまでの歩み:', ...renderTimeline(steps, loadRoadmap()).split('\n').map((l) => `  - ${l}`));
     lines.push('');
   }
@@ -126,7 +126,8 @@ function outcomeCell(member) {
 function journeyCell(member) {
   const steps = member.milestones?.length ? renderTimeline(member.milestones, loadRoadmap()).split('\n').map(escapeHtml) : [];
   const months = (member.months ?? []).map((m) => `${escapeHtml(m.month)}: ${m.days}日`);
-  return [...steps, ...months].join('<br>') || '-';
+  const values = (member.snapshots ?? []).map((v) => `${escapeHtml(v.month)}: 作ったもの ${v.made}件、月 ${v.savedHours}時間`);
+  return [...steps, ...months, ...values].join('<br>') || '-';
 }
 
 export function renderPage(members) {
@@ -198,7 +199,7 @@ function memberStatus(member, repos, rules, workDir) {
     url: launch === null ? null : urlOf(launch),
     stepups: listFiles(dir, 'docs/stepups').length,
   };
-  return { ...member, repo: repo.full_name, result, problem, outcome, share: parseShare(readRepoFile(dir, 'team-share.json')), activity: result.activity, phase: result.phase, milestones: parseMilestones(readRepoFile(dir, 'milestones.json')), months: monthlyActivity(parseActivity(readRepoFile(dir, 'activity.json'))) };
+  return { ...member, repo: repo.full_name, result, problem, outcome, share: parseShare(readRepoFile(dir, 'team-share.json')), activity: result.activity, phase: result.phase, milestones: parseMilestones(readRepoFile(dir, 'milestones.json')), months: monthlyActivity(parseActivity(readRepoFile(dir, 'activity.json'))), snapshots: parseSnapshots(readRepoFile(dir, 'milestones.json')) };
 }
 
 export function shouldSyncTeam(members, login, operator) {
