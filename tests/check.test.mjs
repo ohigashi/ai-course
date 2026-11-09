@@ -312,3 +312,66 @@ test('段階0だけ済の人の次は段階2(小さな自動化が先)', () => {
   const dir = repo({});
   assert.equal(evaluate(dir, rules, { ...noRemote, assumeInvited: true }).currentStage, 2);
 });
+
+const worksFile = (items) => JSON.stringify({ items });
+const aWork = (slug, phase, next = '') => ({ slug, name: slug, phase, state: 'active', next, rounds: [], startedAt: '2026-11-01', touchedAt: '2026-11-01' });
+const tasksDoc = '- 月次の集計 2時間\n- 請求書の作成 30分\n- 会議の議事録 1時間\n';
+const claudeMd = ['仕事と役割', 'AIに任せたいこと', '文章や報告の好み', '確認してほしいタイミング', '大切にしている判断の基準'].map((h) => `## ${h}\n受講者Aの内容です\n`).join('\n');
+
+test('evaluate: 取り組みごとに別の場所を判定する', () => {
+  const dir = repo({
+    'works.json': worksFile([aWork('main', 2), aWork('w1', 2)]),
+    'works/w1/docs/01-tasks.md': tasksDoc,
+  });
+  const r = evaluate(dir, loadRules(), { ...noRemote, assumeInvited: true });
+  const main = r.works.find((w) => w.slug === 'main');
+  const w1 = r.works.find((w) => w.slug === 'w1');
+  assert.ok(main.checks[2].missing.some((m) => m.includes('01-tasks')));
+  assert.ok(!w1.checks[2].missing.some((m) => m.includes('01-tasks')));
+  assert.ok(w1.checks[2].missing.some((m) => m.includes('01-problem')));
+});
+
+test('evaluate: 取り組みの判定は段階0を含まず、フェーズ1は段階2だけを見る', () => {
+  const dir = repo({ 'works.json': worksFile([aWork('main', 1)]) });
+  const r = evaluate(dir, loadRules(), { ...noRemote, assumeInvited: true });
+  const missing = r.works[0].checks[1].missing;
+  assert.ok(missing.length > 0);
+  assert.ok(!missing.some((m) => m.includes('CLAUDE.md')));
+  assert.ok(missing.every((m) => m.includes('work/') || m.includes('02-log')));
+});
+
+test('evaluate: nextAction はフェーズ1と2は未完了の先頭、3と4は本人の決めた文', () => {
+  const dir = repo({ 'works.json': worksFile([aWork('main', 1), aWork('w1', 3, '2本目を作る'), aWork('w2', 4, '')]) });
+  const r = evaluate(dir, loadRules(), { ...noRemote, assumeInvited: true });
+  const by = (s) => r.works.find((w) => w.slug === s);
+  assert.equal(by('main').nextAction, by('main').checks[1].missing[0]);
+  assert.equal(by('w1').nextAction, '2本目を作る');
+  assert.equal(by('w2').nextAction, '/next で次にやることを決める');
+});
+
+test('evaluate: フェーズ1と2を通った取り組みで next が空なら /next を案内する', () => {
+  const dir = repo({ 'works.json': worksFile([aWork('main', 1)]) });
+  const rules = loadRules().map((r) => ({ ...r, checks: [] }));
+  const r = evaluate(dir, rules, { ...noRemote, assumeInvited: true });
+  assert.equal(r.works[0].nextAction, '/next で次にやることを決める');
+});
+
+test('evaluate: works.json が壊れている、または空でも既定の一覧で動く', () => {
+  for (const body of ['{', worksFile([])]) {
+    const r = evaluate(repo({ 'works.json': body }), loadRules(), { ...noRemote, assumeInvited: true });
+    assert.equal(r.works[0].slug, 'main');
+  }
+  assert.equal(evaluate(repo({}), loadRules(), { ...noRemote, assumeInvited: true }).works[0].slug, 'main');
+});
+
+test('evaluate: setupDone は段階0だけを見る', () => {
+  const rules = loadRules();
+  assert.equal(evaluate(repo({ 'CLAUDE.md': claudeMd }), rules, { ...noRemote, assumeInvited: true }).setupDone, true);
+  assert.equal(evaluate(repo({}), rules, { ...noRemote, assumeInvited: true }).setupDone, false);
+});
+
+test('evaluate: 取り組みの判定はファイルを書かない', () => {
+  const dir = repo({});
+  evaluate(dir, loadRules(), { ...noRemote, assumeInvited: true });
+  assert.equal(readRepoFile(dir, 'works.json'), null);
+});

@@ -4,7 +4,8 @@ import { readFileSync, existsSync, lstatSync, realpathSync, readdirSync } from '
 import { join, dirname, relative, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { renderRoadmap } from './roadmap.mjs';
-import { activitySummary, parseActivity } from './activity.mjs';
+import { activitySummary, parseActivity, todayString } from './activity.mjs';
+import { WORKS_FILE, parseWorks, defaultWorks, workPath } from './works.mjs';
 import { loadPhases, phaseOfStage } from './phases.mjs';
 import { levelProgress, loadCatalog, parseCompleted } from './challenge.mjs';
 
@@ -204,6 +205,30 @@ export function updateReminderText(output) {
   return 'コースの教材に更新があります。受講者に最初の返答で1文で伝え、/next で内容を確かめて取り込めることを案内してください。';
 }
 
+// 取り組みごとに判定するフェーズと、その段階(段階0は全体の入口なので含めない)
+const WORK_STAGES = { 1: [2], 2: [1, 3, 4, 5] };
+const NO_NEXT = '/next で次にやることを決める';
+
+function forWork(slug, check) {
+  const scoped = { ...check };
+  if (check.path) scoped.path = workPath(slug, check.path);
+  if (check.dir) scoped.dir = workPath(slug, check.dir);
+  return scoped;
+}
+
+function evaluateWork(repoDir, rules, env, work) {
+  const checks = {};
+  for (const [phase, ids] of Object.entries(WORK_STAGES)) {
+    const missing = rules
+      .filter((rule) => ids.includes(rule.id))
+      .flatMap((rule) => rule.checks.flatMap((check) => runCheck(repoDir, forWork(work.slug, check), env)));
+    checks[phase] = { done: missing.length === 0, missing };
+  }
+  const own = checks[work.phase];
+  const nextAction = own?.missing[0] ?? (work.next || NO_NEXT);
+  return { ...work, checks, nextAction };
+}
+
 export function evaluate(repoDir, rules, env) {
   const stages = rules.map((rule) => {
     const missing = rule.checks.flatMap((check) => runCheck(repoDir, check, env));
@@ -214,7 +239,12 @@ export function evaluate(repoDir, rules, env) {
   const currentStage = current ? current.id : null;
   const activity = activitySummary(parseActivity(readRepoFile(repoDir, 'activity.json')));
   const phase = phaseOfStage(currentStage, loadPhases()).title;
-  return { stages, currentStage, lastCommitDate, unsaved: hasUnsavedWork(env), claudeMd: claudeMdStatus(repoDir, env), activity, phase };
+  const setupDone = stages.find((s) => s.id === 0)?.done === true;
+  const parsed = parseWorks(readRepoFile(repoDir, WORKS_FILE));
+  const base = { stages };
+  const list = parsed?.length ? parsed : defaultWorks(base, todayString());
+  const works = list.map((work) => evaluateWork(repoDir, rules, env, work));
+  return { stages, currentStage, lastCommitDate, unsaved: hasUnsavedWork(env), claudeMd: claudeMdStatus(repoDir, env), activity, phase, setupDone, works };
 }
 
 function run(cmd, args, cwd) {
