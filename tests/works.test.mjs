@@ -69,3 +69,11 @@ test('syncRounds: 判定のない取り組みは変えない', () => {
   const w = { ...base };
   assert.deepEqual(syncRounds([w], [], '2026-11-09'), [w]);
 });
+test('parseWorks: フェーズ4の取り組みと、フェーズ3・4の回を残し、5は捨てる', () => {
+  const r3 = { phase: 3, date: '2026-11-09' };
+  const r4 = { phase: 4, date: '2026-11-09' };
+  const kept = parseWorks(JSON.stringify({ items: [{ ...base, phase: 4, rounds: [r3, r4, { phase: 5, date: '2026-11-09' }] }] }));
+  assert.equal(kept[0].phase, 4);
+  assert.deepEqual(kept[0].rounds, [r3, r4]);
+  assert.equal(parseWorks(JSON.stringify({ items: [{ ...base, phase: 5 }] })).length, 0);
+});

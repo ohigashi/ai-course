@@ -4,13 +4,13 @@ import { isRealDate } from './activity.mjs';
 export const WORKS_FILE = 'works.json';
 const MAX_WORKS = 20;
 const TEXT_LIMIT = 120;
-const PHASES = [1, 2, 3];
+const PHASES = [1, 2, 3, 4];
 // 回数を数えるフェーズと、それを判定する段階
 const ROUND_STAGES = { 1: [2], 2: [1, 3, 4, 5] };
 
 const text = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, TEXT_LIMIT) : '');
 const validSlug = (s) => s === 'main' || (typeof s === 'string' && /^w\d{1,3}$/.test(s));
-const validRound = (r) => r && ROUND_STAGES[r.phase] && isRealDate(r.date);
+const validRound = (r) => r && PHASES.includes(r.phase) && isRealDate(r.date);
 
 function cleanWork(w) {
   if (!w || typeof w !== 'object' || Array.isArray(w)) return null;
