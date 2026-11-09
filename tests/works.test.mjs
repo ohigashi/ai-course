@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WORKS_FILE, parseWorks, defaultWorks, workPath, syncRounds, roundCount } from '../scripts/works.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { listFiles, readRepoFile, parseSavings } from '../scripts/check.mjs';
+import { WORKS_FILE, parseWorks, defaultWorks, workPath, syncRounds, roundCount, worksOutcome } from '../scripts/works.mjs';
 
 const done = (...ids) => ({ stages: [0,1,2,3,4,5,6,7].map((id) => ({ id, done: ids.includes(id), missing: [] })), currentStage: null });
 const base = { slug: 'w1', name: 'a', phase: 2, state: 'active', next: '', rounds: [], startedAt: '2026-11-09', touchedAt: '2026-11-09' };
@@ -76,4 +80,16 @@ test('parseWorks: フェーズ4の取り組みと、フェーズ3・4の回を�
   assert.equal(kept[0].phase, 4);
   assert.deepEqual(kept[0].rounds, [r3, r4]);
   assert.equal(parseWorks(JSON.stringify({ items: [{ ...base, phase: 5 }] })).length, 0);
+});
+
+test('worksOutcome: main と各取り組みの作ったものと減らした時間を合計する', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wo-'));
+  const put = (p, body) => { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), body); };
+  const log = (n) => `1回あたりの時間(前): 60分\n1回あたりの時間(後): 0分\n月の回数: ${n}\n`;
+  put('work/a.txt', 'a'); put('docs/02-log.md', log(1));
+  put('works/w1/app/b.txt', 'b'); put('works/w1/docs/02-log.md', log(2));
+  const out = worksOutcome(dir, [{ slug: 'main' }, { slug: 'w1' }], { listFiles, readRepoFile, parseSavings });
+  assert.deepEqual(out.made.sort(), ['a.txt', 'b.txt']);
+  assert.equal(out.monthlySavedHours, 3);
+  assert.deepEqual(worksOutcome(dir, [], { listFiles, readRepoFile, parseSavings }).made, ['a.txt']);
 });

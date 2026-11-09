@@ -255,3 +255,24 @@ test('recentMoves: 自動の保存と活用の記録は除き、作業の件名�
   const log = ['2026-11-09T10:00:00\t活用の記録', '2026-11-09T09:00:00\t歩みの更新', '2026-11-08T09:00:00\t議事録の自動化を作った'].join('\n');
   assert.deepEqual(recentMoves(log).map((m) => m.subject), ['議事録の自動化を作った']);
 });
+
+test('一覧: 進めている取り組みの名前、フェーズ、次の一歩を出す', () => {
+  const a = { ...member('受講者A', 'n', 1), outcome: { made: [], monthlySavedHours: 0 }, works: [{ name: '証憑消込', phase: 2, state: 'active', next: '書く', rounds: 1 }] };
+  const html = renderPage([a]);
+  assert.ok(html.includes('証憑消込') && html.includes('課題からアプリを作る') && html.includes('書く'));
+  assert.ok(html.includes('証憑消込: 課題からアプリを作る'));
+});
+
+test('一覧: 取り組みの文字列は HTML エスケープし、works が無ければ従来の表示', () => {
+  const a = { ...member('受講者A', 'n', 1), works: [{ name: '<b>x</b>', phase: 2, state: 'active', next: '<i>n</i>', rounds: 0 }] };
+  const html = renderPage([a]);
+  assert.ok(!html.includes('<b>x') && !html.includes('<i>n') && html.includes('&lt;b&gt;x'));
+  assert.ok(renderPage([member('受講者A', 'n', 1)]).includes('<td>課題からアプリを作る'));
+});
+
+test('TEAM.md: 了承した人の取り組みは名前だけを載せ、次の一歩を載せない', () => {
+  const a = { ...member('受講者A', 'n', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, works: [{ name: '証憑消込', phase: 2, state: 'active', next: '秘密の次', rounds: 1 }, { name: '休み中', phase: 1, state: 'paused', next: '', rounds: 0 }] };
+  const md = renderTeamMd([a]);
+  assert.ok(md.includes('- 進めていること: 証憑消込') && !md.includes('秘密の次') && !md.includes('休み中'));
+  assert.ok(!renderTeamMd([{ ...a, share: shareOf({ share: false }) }]).includes('証憑消込'));
+});

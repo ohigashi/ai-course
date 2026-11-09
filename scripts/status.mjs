@@ -8,6 +8,7 @@ import { parseMilestones, parseSnapshots, renderTimeline } from './history.mjs';
 import { loadRoadmap } from './roadmap.mjs';
 import { evaluate, createEnv, loadRules, loadConfig, sections, readRepoFile, listFiles, parseSavings, urlOf } from './check.mjs';
 import { loadPhases, phaseOfStage } from './phases.mjs';
+import { worksOutcome, parseWorks, WORKS_FILE } from './works.mjs';
 import { AUTO_SUBJECT, PROGRESS_FILE, applyProgress, nextActionOf, parseProgress } from './sync.mjs';
 
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
@@ -86,6 +87,8 @@ export function renderTeamMd(members) {
     const count = m.outcome?.made?.length ?? 0;
     lines.push(`### ${m.name}`, '');
     lines.push(`- いまのフェーズ: ${currentLabel(m)}`);
+    const active = (m.works ?? []).filter((w) => w.state === 'active');
+    if (active.length) lines.push(`- 進めていること: ${active.map((w) => w.name).join('、')}`);
     if (m.share.problem) lines.push(`- 取り組んでいる課題: ${m.share.problem}`);
     if (count || m.share.made) lines.push(`- 作ったもの: ${count}件${m.share.made ? `。${m.share.made}` : ''}`);
     if (m.outcome?.monthlySavedHours) lines.push(`- 減らした時間: 月 ${m.outcome.monthlySavedHours}時間`);
@@ -148,6 +151,21 @@ function outcomeCell(member) {
   return parts.join('<br>') || '-';
 }
 
+const phaseTitle = (id) => loadPhases().find((p) => p.id === id)?.title ?? '';
+const activeWorks = (member) => (member.failed || !member.result ? [] : (member.works ?? []).filter((w) => w.state === 'active'));
+
+// 取り組みがあれば1つにつき1行、無ければ従来のフェーズ名を出す。
+function phaseCell(member) {
+  const works = activeWorks(member);
+  return works.length ? works.map((w) => `${escapeHtml(w.name)}: ${escapeHtml(phaseTitle(w.phase))}`).join('<br>') : escapeHtml(currentLabel(member));
+}
+
+function nextCell(member) {
+  const works = activeWorks(member);
+  if (!works.length || member.courseBehind) return escapeHtml(nextStepOf(member));
+  return works.map((w) => escapeHtml(w.next || '-')).join('<br>');
+}
+
 function journeyCell(member) {
   const text = member.milestones?.length ? renderTimeline(member.milestones, loadRoadmap(), { phases: loadPhases(), mechanisms: [] }) : '';
   const steps = text ? text.split('\n').map(escapeHtml) : [];
@@ -163,8 +181,8 @@ export function renderPage(members) {
   const summary = [...counts].map(([label, n]) => `<tr><td>${escapeHtml(label)}</td><td class="n">${n}人</td></tr>`).join('');
   const rows = sorted.map((m) => `<tr>
 <td>${escapeHtml(m.name)}</td>
-<td>${escapeHtml(currentLabel(m))}${stateNotes(m).map((n) => `<br>${escapeHtml(n)}`).join('')}</td>
-<td>${escapeHtml(nextStepOf(m))}</td>
+<td>${phaseCell(m)}${stateNotes(m).map((n) => `<br>${escapeHtml(n)}`).join('')}</td>
+<td>${nextCell(m)}</td>
 <td>${remaining(m).map(escapeHtml).join('<br>') || '-'}</td>
 <td>${m.problem ? escapeHtml(m.problem) : '-'}</td>
 <td>${outcomeCell(m)}</td>
@@ -223,15 +241,15 @@ function memberStatus(member, repos, rules, workDir) {
   const recent = recentMoves(git(dir, 'log', '-20', '--format=%cI%x09%s'));
   const text = readRepoFile(dir, 'docs/01-problem.md');
   const problem = text === null ? null : problemOf(text);
-  const log = readRepoFile(dir, 'docs/02-log.md');
   const launch = readRepoFile(dir, 'docs/05-launch.md');
+  const all = worksOutcome(dir, parseWorks(readRepoFile(dir, WORKS_FILE)) ?? [], { listFiles, readRepoFile, parseSavings });
   const outcome = {
-    made: [...listFiles(dir, 'work'), ...listFiles(dir, 'app')].slice(0, 8),
-    monthlySavedHours: log === null ? 0 : parseSavings(log)?.monthlySavedHours ?? 0,
+    made: all.made.slice(0, 8),
+    monthlySavedHours: all.monthlySavedHours,
     url: launch === null ? null : urlOf(launch),
     stepups: listFiles(dir, 'docs/stepups').length,
   };
-  return { ...member, repo: repo.full_name, result, problem, outcome, synced: progress !== null, courseBehind, recent, share: parseShare(readRepoFile(dir, 'team-share.json')), activity: result.activity, milestones: parseMilestones(readRepoFile(dir, 'milestones.json')), snapshots: parseSnapshots(readRepoFile(dir, 'milestones.json')) };
+  return { ...member, repo: repo.full_name, result, works: progress ? progress.works : [], problem, outcome, synced: progress !== null, courseBehind, recent, share: parseShare(readRepoFile(dir, 'team-share.json')), activity: result.activity, milestones: parseMilestones(readRepoFile(dir, 'milestones.json')), snapshots: parseSnapshots(readRepoFile(dir, 'milestones.json')) };
 }
 
 export function shouldSyncTeam(members, login, operator) {

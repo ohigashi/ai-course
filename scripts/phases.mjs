@@ -14,7 +14,18 @@ export function phaseOfStage(stageId, phases) {
   return phases.find((p) => p.stages.includes(stageId));
 }
 
+// 最後に作業した active な取り組みを選ぶ(同じ日なら配列の後ろ)。touchedAt が無い結果(運営側)は最初の active。
+function leadingWork(works) {
+  const active = (works ?? []).filter((w) => w.state === 'active');
+  let best = active[0];
+  for (const w of active.slice(1)) if (w.touchedAt && (!best.touchedAt || w.touchedAt >= best.touchedAt)) best = w;
+  return best;
+}
+
 export function nextActionOf(result) {
+  const work = leadingWork(result.works);
+  const own = work?.nextAction ?? work?.next;
+  if (own) return own;
   if (result.currentStage === null) {
     const challenge = result.stages.find((s) => s.id === CHALLENGE_STAGE);
     if (challenge && !challenge.done) return '/challenge で次の課題に取り組む';

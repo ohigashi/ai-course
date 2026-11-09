@@ -7,7 +7,7 @@ import { levelProgress, loadCatalog, parseCompleted } from './challenge.mjs';
 import { isRealDate, parseActivity, LEGACY_PHASES, todayString } from './activity.mjs';
 import { loadRoadmap } from './roadmap.mjs';
 import { loadPhases } from './phases.mjs';
-import { roundCount } from './works.mjs';
+import { roundCount, worksOutcome } from './works.mjs';
 import { loadMechanisms, parseMechanismLog } from './mechanism.mjs';
 
 const MILESTONES_FILE = 'milestones.json';
@@ -80,9 +80,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const phases = loadPhases();
   const phasesDone = phases.filter((p) => result.works.some((work) => roundCount(work, p.id) >= 1)).map((p) => p.id);
   const events = syncMilestones(parseMilestones(current), { stagesDone, phasesDone, levels }, todayString());
-  const log = readRepoFile(repoDir, 'docs/02-log.md');
-  const made = listFiles(repoDir, 'work').length + listFiles(repoDir, 'app').length;
-  const snapshots = syncSnapshots(parseSnapshots(current), todayString().slice(0, 7), made, log === null ? 0 : parseSavings(log)?.monthlySavedHours ?? 0);
+  const outcome = worksOutcome(repoDir, result.works, { listFiles, readRepoFile, parseSavings });
+  const snapshots = syncSnapshots(parseSnapshots(current), todayString().slice(0, 7), outcome.made.length, outcome.monthlySavedHours);
   writeFileSync(MILESTONES_FILE, `${JSON.stringify({ events, snapshots }, null, 2)}\n`);
   // 仕組みのお題は手元の記録から表示のときだけ合わせる(milestones.json には書かない)
   const mechanisms = loadMechanisms();

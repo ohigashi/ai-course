@@ -13,6 +13,7 @@ export const AUTO_SUBJECT = 'コースの状態を保存';
 const COURSE_PATHS = ['course', 'scripts', '.claude/skills', '.claude/settings.json'];
 const TEXT_LIMIT = 200;
 const MISSING_LIMIT = 20;
+const MAX_WORKS = 20;
 const text = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, TEXT_LIMIT) : '');
 
 export { nextActionOf } from './phases.mjs';
@@ -23,6 +24,7 @@ export function buildProgress(result) {
     phase: result.phase,
     nextAction: nextActionOf(result),
     stages: result.stages.map((s) => ({ id: s.id, done: s.done, missing: s.missing })),
+    works: (result.works ?? []).map((w) => ({ name: w.name, phase: w.phase, state: w.state, next: w.nextAction, rounds: w.rounds.length })),
   };
 }
 
@@ -40,7 +42,12 @@ export function parseProgress(raw, stageIds) {
   const stages = data.stages
     .filter((s) => s && stageIds.includes(s.id) && typeof s.done === 'boolean' && Array.isArray(s.missing))
     .map((s) => ({ id: s.id, done: s.done, missing: s.missing.map(text).filter(Boolean).slice(0, MISSING_LIMIT) }));
-  return { currentStage: data.currentStage, phase: [...LEGACY_PHASES, ...loadPhases().map((p) => p.title)].includes(data.phase) ? data.phase : null, stages };
+  const works = (Array.isArray(data.works) ? data.works : [])
+    .filter((w) => w && typeof w === 'object' && text(w.name) && Number.isInteger(w.phase) && w.phase >= 1 && w.phase <= 4
+      && (w.state === 'active' || w.state === 'paused') && Number.isInteger(w.rounds) && w.rounds >= 0)
+    .slice(0, MAX_WORKS)
+    .map((w) => ({ name: text(w.name), phase: w.phase, state: w.state, next: text(w.next), rounds: w.rounds }));
+  return { works, currentStage: data.currentStage, phase: [...LEGACY_PHASES, ...loadPhases().map((p) => p.title)].includes(data.phase) ? data.phase : null, stages };
 }
 
 export function applyProgress(result, progress) {
@@ -49,6 +56,7 @@ export function applyProgress(result, progress) {
     ...result,
     currentStage: progress.currentStage,
     phase: progress.phase ?? result.phase,
+    works: progress.works,
     stages: result.stages.map((s) => {
       const own = progress.stages.find((p) => p.id === s.id);
       return own ? { ...s, done: own.done, missing: own.missing } : s;

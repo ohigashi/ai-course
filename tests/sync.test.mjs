@@ -35,7 +35,7 @@ test('課題解決も終えた人には /challenge を案内しない', () => {
 });
 
 test('保存する内容は判定と次の一歩だけで、受講者の文章を含まない', () => {
-  assert.deepEqual(Object.keys(buildProgress({ ...result(5), claudeMd: { secret: 1 }, activity: { monthDays: 3 } })).sort(), ['currentStage', 'nextAction', 'phase', 'stages']);
+  assert.deepEqual(Object.keys(buildProgress({ ...result(5), claudeMd: { secret: 1 }, activity: { monthDays: 3 } })).sort(), ['currentStage', 'nextAction', 'phase', 'stages', 'works']);
 });
 
 test('parseProgress: 作ったものをそのまま読み戻せる', () => {
@@ -191,4 +191,46 @@ test('同期: 前回送れなかった自動の保存は、次に送る', () => 
   git(dir, 'remote', 'set-url', 'origin', remote);
   assert.deepEqual(syncRepo(dir, result(5)), { committed: false, pushed: true });
   assert.ok(remoteFiles(remote).includes('progress.json'));
+});
+
+test('buildProgress: 取り組みは名前、フェーズ、状態、次、回数だけを送る', () => {
+  const out = buildProgress({ ...result(5), works: [{ slug: 'w1', name: 'A', phase: 2, state: 'active', next: 'x', rounds: [{ phase: 2, date: 'd' }], nextAction: '書く', checks: {}, startedAt: 'd', touchedAt: 'd' }] });
+  assert.deepEqual(out.works, [{ name: 'A', phase: 2, state: 'active', next: '書く', rounds: 1 }]);
+});
+
+test('parseProgress: works が無い旧版は空、不正な項目は捨てる', () => {
+  assert.deepEqual(parseProgress(JSON.stringify({ currentStage: 5, phase: '慣れる', stages: [] }), IDS).works, []);
+  const bad = [
+    { name: 'A', phase: 9, state: 'active', next: '', rounds: 0 },
+    { name: '', phase: 2, state: 'active', next: '', rounds: 0 },
+    { name: 'C', phase: 2, state: 'x', next: '', rounds: 0 },
+    { name: 'D', phase: 2, state: 'active', next: '', rounds: -1 },
+    { name: 'E', phase: 2, state: 'active', next: '', rounds: 1.5 },
+    { name: 'B', phase: 2, state: 'active', next: ' a\n b ', rounds: 1 },
+  ];
+  const works = parseProgress(JSON.stringify({ currentStage: 5, phase: '慣れる', stages: [], works: bad }), IDS).works;
+  assert.deepEqual(works, [{ name: 'B', phase: 2, state: 'active', next: 'a b', rounds: 1 }]);
+});
+
+test('parseProgress: 取り組みは20件まで', () => {
+  const many = Array.from({ length: 30 }, (_, i) => ({ name: `n${i}`, phase: 1, state: 'active', next: '', rounds: 0 }));
+  assert.equal(parseProgress(JSON.stringify({ currentStage: 5, phase: '慣れる', stages: [], works: many }), IDS).works.length, 20);
+});
+
+test('applyProgress: 取り組みを結果に引き継ぐ', () => {
+  const progress = parseProgress(JSON.stringify({ currentStage: 5, phase: '慣れる', stages: [], works: [{ name: 'B', phase: 2, state: 'active', next: 'n', rounds: 0 }] }), IDS);
+  assert.deepEqual(applyProgress(result(5), progress).works.map((w) => w.name), ['B']);
+});
+
+test('nextActionOf: 最後に作業した active な取り組みの次の一歩を優先する', () => {
+  const w = (name, state, touchedAt, nextAction) => ({ name, state, touchedAt, nextAction });
+  const r = { ...result(5), works: [w('a', 'active', '2026-11-01', '古い'), w('b', 'paused', '2026-11-09', '止まり'), w('c', 'active', '2026-11-05', '新しい')] };
+  assert.equal(nextActionOf(r), '新しい');
+  assert.equal(nextActionOf({ ...r, works: [w('a', 'active', '2026-11-05', '前'), w('c', 'active', '2026-11-05', '後')] }), '後');
+});
+
+test('nextActionOf: 運営側(touchedAt なし)は最初の active の next、active が無ければ従来', () => {
+  const r = { ...result(5), works: [{ name: 'p', state: 'paused', next: 'p' }, { name: 'a', state: 'active', next: '最初' }, { name: 'b', state: 'active', next: '二番目' }] };
+  assert.equal(nextActionOf(r), '最初');
+  assert.equal(nextActionOf({ ...result(5), works: [{ name: 'p', state: 'paused', next: 'p' }] }), '公開先を書く');
 });

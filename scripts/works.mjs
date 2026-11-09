@@ -66,3 +66,16 @@ export function syncRounds(works, evaluated, today) {
 }
 
 export const roundCount = (work, phaseId) => work.rounds.filter((r) => r.phase === phaseId).length;
+
+// 全取り組み(main と w*)の作ったものと減らした時間。check.mjs が works.mjs を読むので、読み取りの道具は呼び出し側から受け取る。
+export function worksOutcome(dir, works, { listFiles, readRepoFile, parseSavings }) {
+  const slugs = ['main', ...works.map((w) => w.slug).filter((s) => s !== 'main')];
+  const made = [];
+  let hours = 0;
+  for (const slug of slugs) {
+    made.push(...listFiles(dir, workPath(slug, 'work')), ...listFiles(dir, workPath(slug, 'app')));
+    const log = readRepoFile(dir, workPath(slug, 'docs/02-log.md'));
+    hours += log === null ? 0 : parseSavings(log)?.monthlySavedHours ?? 0;
+  }
+  return { made, monthlySavedHours: Math.round(hours * 10) / 10 };
+}
