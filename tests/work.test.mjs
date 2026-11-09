@@ -150,3 +150,29 @@ test('CLI: sync は works.json を作り、list は取り組みを表示する',
   assert.match(r.stdout, /main/);
   assert.ok(!r.stdout.includes('段階'));
 });
+
+test('CLI: 判定が通って回数が未保存でも、round は1回目を記録するだけで2回目は足さない', () => {
+  const dir = tmpRepo();
+  cli(dir, 'new', 'A');
+  writeFileSync(join(dir, 'works/w1/work/tool.txt'), 'x');
+  writeFileSync(join(dir, 'works/w1/docs/02-log.md'), [
+    '# 小さな自動化の記録', '', '1回あたりの時間(前): 30分', '1回あたりの時間(後): 5分', '月の回数: 4回', '',
+    '## やったこと', '', '請求書の作成をスクリプトにしました。', '', '## 結果', '', '作業が5分に短くなりました。', '',
+  ].join('\n'));
+  assert.equal(roundCount(readWorks(dir).find((w) => w.slug === 'w1'), 1), 0);
+  const first = cli(dir, 'round', 'w1');
+  assert.equal(first.status, 0, first.stdout);
+  assert.equal(roundCount(readWorks(dir).find((w) => w.slug === 'w1'), 1), 1);
+  const second = cli(dir, 'round', 'w1');
+  assert.equal(second.status, 0, second.stdout);
+  assert.equal(roundCount(readWorks(dir).find((w) => w.slug === 'w1'), 1), 2);
+});
+test('CLI: next に文章がなければ止まり、書き換えない', () => {
+  const dir = tmpRepo();
+  cli(dir, 'new', 'A');
+  cli(dir, 'next', 'w1', '見積りを作る');
+  const before = readFileSync(join(dir, 'works.json'), 'utf8');
+  const r = cli(dir, 'next', 'w1');
+  assert.notEqual(r.status, 0);
+  assert.equal(readFileSync(join(dir, 'works.json'), 'utf8'), before);
+});

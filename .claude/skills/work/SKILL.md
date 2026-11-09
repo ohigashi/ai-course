@@ -14,7 +14,7 @@ description: 取り組み(進める仕事の単位)を始める、動かす、�
    - 次にやることを書き換える: `node scripts/work.mjs next <slug> <文>`
    - 休む: `node scripts/work.mjs pause <slug>`
    - 再開する: `node scripts/work.mjs resume <slug>`
-   - 一区切りにする(同じフェーズをもう1回やった記録): `node scripts/work.mjs round <slug>`
+   - 一区切りにする(同じフェーズをもう1回やった記録): `node scripts/work.mjs round <slug>`。判定が通った1回目は、実行時に自動で記録される(その回は2回目を足さないので、もう1回やったあとにもう一度実行する)
    - 判定の結果を回数に反映する: `node scripts/work.mjs sync`
 3. 止まったときは、表示された理由をそのまま受講者に伝える。works.json が壊れている場合は書き換えず、大東への相談を案内する
 4. 取り組みの名前に顧客名や個人名を入れない(「提案書づくり」「請求の自動化」のように仕事の内容で付ける)。入っていたら、言い換えを提案する

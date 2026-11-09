@@ -69,11 +69,14 @@ const fail = (message) => {
 // 取り組み用の文書の元は course/templates/ のひな形。受講者が書いた docs/ は使わない。
 function copyTemplates(repoDir, slug) {
   const docs = join(repoDir, 'works', slug, 'docs');
-  mkdirSync(docs, { recursive: true });
   const files = loadRules().filter((r) => DOC_STAGES.includes(r.id)).flatMap((r) => r.checks).map((c) => c.path).filter((p) => p?.startsWith('docs/'));
-  for (const path of new Set(files)) {
-    const dest = join(docs, path.split('/').pop());
-    if (!existsSync(dest)) cpSync(join(courseRoot, 'course', 'templates', path.split('/').pop()), dest);
+  const sources = [...new Set(files)].map((path) => join(courseRoot, 'course', 'templates', path.split('/').pop()));
+  const missing = sources.find((src) => !existsSync(src));
+  if (missing) throw new Error(`文書のひな形 ${missing} が見つかりません。コースの教材を更新してからやり直してください。何も作っていません。`);
+  mkdirSync(docs, { recursive: true });
+  for (const src of sources) {
+    const dest = join(docs, src.split('/').pop());
+    if (!existsSync(dest)) cpSync(src, dest);
   }
   for (const dir of ['work', 'app']) {
     mkdirSync(join(repoDir, 'works', slug, dir), { recursive: true });
@@ -97,12 +100,12 @@ function main(args) {
     if (cmd === 'list') {
       for (const w of evaluated.works) {
         console.log(`${w.slug}  ${w.name}  フェーズ${w.phase}  ${w.state === 'paused' ? '休み中' : '進行中'}`);
-        console.log(`  次: ${w.nextAction}`);
+        console.log(`  次にやること: ${w.nextAction}`);
       }
     } else if (cmd === 'sync') {
       const next = syncRounds(current, evaluated.works, today);
       if (raw === null || JSON.stringify(next) !== JSON.stringify(stored)) save(next);
-      console.log('取り組みの回数を判定の結果に合わせました。');
+      console.log('取り組みの回数を、判定の結果に更新しました。');
     } else if (cmd === 'new') {
       const at = rest.indexOf('--phase');
       const phase = at >= 0 ? Number(rest[at + 1]) : 1;
@@ -119,16 +122,26 @@ function main(args) {
       console.log(`取り組み ${slug} をフェーズ${phase}に動かしました。`);
     } else if (cmd === 'next') {
       const [slug, ...words] = rest;
+      if (!words.join(' ').trim()) throw new Error('次にやることの文章を指定してください。何も書き換えていません。');
       save(setWorkNext(current, slug, words.join(' '), today));
       console.log(`取り組み ${slug} の次にやることを書き換えました。`);
     } else if (cmd === 'pause' || cmd === 'resume') {
       save(setWorkState(current, rest[0], cmd === 'pause' ? 'paused' : 'active', today));
       console.log(`取り組み ${rest[0]} を${cmd === 'pause' ? '休みにしました' : '再開しました'}。`);
     } else if (cmd === 'round') {
-      const works = closeRound(current, rest[0], today);
-      save(works);
-      const w = works.find((x) => x.slug === rest[0]);
-      console.log(`取り組み ${w.slug} のフェーズ${w.phase}を一区切りにしました(${roundCount(w, w.phase)}回目)。`);
+      // 保存済みの回数が古いことがあるので、先に判定の結果を反映する
+      const synced = syncRounds(current, evaluated.works, today);
+      const before = current.find((x) => x.slug === rest[0]);
+      const after = synced.find((x) => x.slug === rest[0]);
+      if (before && roundCount(after, after.phase) > roundCount(before, before.phase)) {
+        save(synced);
+        console.log(`取り組み ${after.slug} のフェーズ${after.phase}の1回目は、判定が通ったので記録しました。もう1回やったときに、もう一度 round を実行してください。`);
+      } else {
+        const works = closeRound(synced, rest[0], today);
+        save(works);
+        const w = works.find((x) => x.slug === rest[0]);
+        console.log(`取り組み ${w.slug} のフェーズ${w.phase}を一区切りにしました(${roundCount(w, w.phase)}回目)。`);
+      }
     } else {
       fail('使い方: node scripts/work.mjs list | sync | new <名前> [--phase N] | move <slug> <N> | next <slug> <文> | pause <slug> | resume <slug> | round <slug>');
     }
