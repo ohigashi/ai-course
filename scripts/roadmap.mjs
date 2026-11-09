@@ -25,7 +25,7 @@ function phaseLines(result, phase, extras) {
       continue;
     }
     const done = roundCount(work, phase.id);
-    lines.push(`${ITEM}${work.name}${done >= 1 ? `(${done + 1}回目)` : ''}`, `${SUB}次にやること: ${work.nextAction}`, `${SUB}作りながら分かること: ${phase.learn}`);
+    lines.push(`${ITEM}${work.name}${(phase.id <= 2 ? work.redo : done >= 1) ? `(${done + 1}回目)` : ''}`, `${SUB}次にやること: ${work.nextAction}`, `${SUB}作りながら分かること: ${phase.learn}`);
   }
   if (phase.id === 4 && extras.challengeStarted) lines.push(`${ITEM}課題解決`, `${SUB}次にやること: ${CHALLENGE_NEXT}`);
   if (phase.id === 4 && extras.teamStarted) lines.push(`${ITEM}チームで作る`);

@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { loadRules, evaluate, listFiles, readRepoFile, claudeMdStatus, reminderText, parseSavings, updateReminderText } from '../scripts/check.mjs';
+import { workPath, syncRounds } from '../scripts/works.mjs';
 
 const noRemote = { git: () => null, gh: () => null };
 
@@ -349,8 +350,8 @@ test('evaluate: nextAction はフェーズ1と2は未完了の先頭、3と4は�
   assert.equal(by('w2').nextAction, '/next で次にやることを決める');
 });
 
-test('evaluate: フェーズ1と2を通った取り組みで next が空なら /next を案内する', () => {
-  const dir = repo({ 'works.json': worksFile([aWork('main', 1)]) });
+test('evaluate: やり直し中でフェーズ1を通った取り組みで next が空なら /next を案内する', () => {
+  const dir = repo({ 'works.json': worksFile([{ ...aWork('main', 1), redo: true }]) });
   const rules = loadRules().map((r) => ({ ...r, checks: [] }));
   const r = evaluate(dir, rules, { ...noRemote, assumeInvited: true });
   assert.equal(r.works[0].nextAction, '/next で次にやることを決める');
@@ -384,4 +385,48 @@ test('listFiles: 途中がリポジトリの外へのシンボリックリンク
   assert.deepEqual(listFiles(dir, 'works/w1/work'), []);
   const inner = repo({ 'works/w1/work/a.txt': '中のファイル' });
   assert.deepEqual(listFiles(inner, 'works/w1/work'), ['a.txt']);
+});
+
+test('evaluate: 取り組みの未完了の文も、その取り組みの場所を指す(main はそのまま)', () => {
+  const dir = repo({ 'works.json': worksFile([aWork('main', 1), aWork('w1', 1)]) });
+  const r = evaluate(dir, loadRules(), { ...noRemote, assumeInvited: true });
+  const by = (s) => r.works.find((w) => w.slug === s);
+  assert.ok(by('w1').nextAction.includes('works/w1/'), by('w1').nextAction);
+  assert.ok(by('w1').checks[1].missing.every((m) => m.includes('works/w1/')));
+  assert.ok(by('main').checks[1].missing.every((m) => !m.includes('works/')));
+  const p2 = evaluate(repo({ 'works.json': worksFile([aWork('w1', 2)]) }), loadRules(), { ...noRemote, assumeInvited: true }).works[0];
+  assert.ok(p2.checks[2].missing.every((m) => m.includes('works/w1/')), p2.checks[2].missing.join('|'));
+});
+
+test('evaluate: フェーズ1と2を通って redo でなく next が空なら /work でフェーズを選ぶ。redo なら従来どおり', () => {
+  const rules = loadRules().map((r) => ({ ...r, checks: [] }));
+  const run = (work) => evaluate(repo({ 'works.json': worksFile([work]) }), rules, { ...noRemote, assumeInvited: true }).works[0].nextAction;
+  assert.equal(run(aWork('main', 1)), 'このフェーズを終えました。次に進むフェーズを /work で選びます');
+  assert.equal(run(aWork('main', 2)), 'このフェーズを終えました。次に進むフェーズを /work で選びます');
+  assert.equal(run({ ...aWork('main', 1), redo: true }), '/next で次にやることを決める');
+  assert.equal(run(aWork('main', 1, '本人の文')), '本人の文');
+  assert.equal(run(aWork('main', 3)), '/next で次にやることを決める');
+});
+
+test('evaluate: 同じ URL は1回の判定で1度だけ確かめ、届かなければフェーズ2の回は記録されない', () => {
+  const launch = '## 公開先\nhttps://example.invalid/app を公開した。\n'.repeat(1);
+  const calls = [];
+  const http = (url) => { calls.push(url); return 'HTTP/2 500\n'; };
+  const files = { 'works.json': worksFile([aWork('main', 2), aWork('w1', 2)]) };
+  for (const slug of ['main', 'w1']) files[workPath(slug, 'docs/05-launch.md')] = launch;
+  const rule = { id: 5, title: 't', checks: [{ type: 'url', path: 'docs/05-launch.md', label: 'docs/05-launch.md に公開URLを書く' }] };
+  const dir = repo(files);
+  const r = evaluate(dir, [rule], { ...noRemote, http });
+  assert.equal(calls.length, 1);
+  assert.ok(r.works.every((w) => w.checks[2].done === false));
+  const synced = syncRounds([aWork('main', 2), aWork('w1', 2)], r.works, '2026-11-09');
+  assert.ok(synced.every((w) => !w.rounds.some((x) => x.phase === 2)));
+  const ok = evaluate(dir, [rule], { ...noRemote, http: () => 'HTTP/2 200\n' });
+  assert.ok(syncRounds([aWork('main', 2)], ok.works, '2026-11-09')[0].rounds.some((x) => x.phase === 2));
+});
+
+test('claudeMdStatus: works.json の変更は作業の回数に入れない', () => {
+  const calls = [];
+  claudeMdStatus(repo({ 'CLAUDE.md': '# 本物' }), { git: (args) => { calls.push(args); return args[0] === 'log' ? 'abc 2026-10-01T00:00:00+09:00' : '3'; } });
+  assert.ok(calls.some((a) => a.includes(':!works.json')));
 });

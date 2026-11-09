@@ -18,7 +18,7 @@ function cleanWork(w) {
   if (w.state !== 'active' && w.state !== 'paused') return null;
   if (!isRealDate(w.startedAt) || !isRealDate(w.touchedAt)) return null;
   const rounds = (Array.isArray(w.rounds) ? w.rounds : []).filter(validRound).map((r) => ({ phase: r.phase, date: r.date }));
-  return { slug: w.slug, name: text(w.name), phase: w.phase, state: w.state, next: text(w.next), rounds, startedAt: w.startedAt, touchedAt: w.touchedAt };
+  return { slug: w.slug, name: text(w.name), phase: w.phase, state: w.state, next: text(w.next), rounds, redo: w.redo === true, startedAt: w.startedAt, touchedAt: w.touchedAt };
 }
 
 // ファイルなしは []。JSON として壊れているときだけ null。
@@ -50,7 +50,7 @@ const phaseDone = (result, phase) => ROUND_STAGES[phase].every((id) => stageDone
 export function defaultWorks(result, today) {
   const phase = !phaseDone(result, 1) ? 1 : !phaseDone(result, 2) ? 2 : 3;
   const rounds = [1, 2].filter((p) => phaseDone(result, p)).map((p) => ({ phase: p, date: today }));
-  return [{ slug: 'main', name: '最初の取り組み', phase, state: 'active', next: '', rounds, startedAt: today, touchedAt: today }];
+  return [{ slug: 'main', name: '最初の取り組み', phase, state: 'active', next: '', rounds, redo: false, startedAt: today, touchedAt: today }];
 }
 
 export const workPath = (slug, path) => (slug === 'main' ? path : `works/${slug}/${path}`);

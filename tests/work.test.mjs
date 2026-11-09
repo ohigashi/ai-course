@@ -176,3 +176,43 @@ test('CLI: next に文章がなければ止まり、書き換えない', () => {
   assert.notEqual(r.status, 0);
   assert.equal(readFileSync(join(dir, 'works.json'), 'utf8'), before);
 });
+
+test('addWork は redo: false。moveWork は回数のあるフェーズへ動かすと redo: true、なければ false', () => {
+  const w = addWork([], 'A', 1, 'd');
+  assert.equal(w[0].redo, false);
+  const passed = [{ ...w[0], rounds: [{ phase: 1, date: 'd' }] }];
+  assert.equal(moveWork(passed, 'w1', 1, 'e')[0].redo, true);
+  assert.equal(moveWork(passed, 'w1', 2, 'e')[0].redo, false);
+  assert.equal(moveWork([{ ...passed[0], redo: true }], 'w1', 3, 'e')[0].redo, false);
+});
+test('closeRound は redo を false に戻す', () => {
+  const w = [{ ...addWork([], 'A', 1, 'd')[0], rounds: [{ phase: 1, date: 'd' }], redo: true }];
+  assert.equal(closeRound(w, 'w1', 'e')[0].redo, false);
+});
+test('CLI: slug などが足りないコマンドは使い方を出して失敗する', () => {
+  const dir = tmpRepo();
+  for (const args of [['move'], ['move', 'w1'], ['next'], ['next', 'w1'], ['pause'], ['resume'], ['round']]) {
+    const r = cli(dir, ...args);
+    assert.notEqual(r.status, 0, args.join(' '));
+    assert.match(r.stdout, /使い方/);
+    assert.doesNotMatch(r.stdout, /undefined/);
+  }
+});
+
+test('CLI: sync は公開先に届かないフェーズ2を記録しない(届く確認を省かない)', () => {
+  const dir = tmpRepo();
+  const long = '内容を十分な長さで書いた文章です。';
+  const put = (path, body) => { mkdirSync(dirname(join(dir, path)), { recursive: true }); writeFileSync(join(dir, path), body); };
+  put('work/a.txt', 'x'); put('app/a.txt', 'x');
+  put('docs/01-tasks.md', '- 集計 2時間\n- 請求 30分\n- 議事録 1時間\n');
+  put('docs/01-problem.md', ['誰の', '何が困っているか', 'いまどうしているか', 'どうなればよいか'].map((h) => `## ${h}\n${long}\n`).join(''));
+  put('docs/02-log.md', `1回あたりの時間(前): 60分\n1回あたりの時間(後): 10分\n月の回数: 4\n## やったこと\n${long}\n## 結果\n${long}\n`);
+  put('docs/03-spec.md', ['誰のためか', '解く課題', '最小の形', '作らないもの', '判断の基準'].map((h) => `## ${h}\n${long}\n`).join(''));
+  put('docs/04-check.md', `## 確かめたこと\n${long}\n## 結果\n${long}\n`);
+  put('docs/05-launch.md', `http://127.0.0.1:1/app\n## 公開したもの\n${long}\n## 公開後に直したこと\n${long}\n`);
+  writeFileSync(join(dir, 'works.json'), JSON.stringify({ items: [{ slug: 'main', name: 'm', phase: 2, state: 'active', next: '', rounds: [], startedAt: '2026-11-01', touchedAt: '2026-11-01' }] }));
+  const r = cli(dir, 'sync');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const rounds = readWorks(dir)[0].rounds;
+  assert.deepEqual(rounds.map((x) => x.phase), [1]);
+});

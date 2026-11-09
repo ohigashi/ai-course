@@ -67,6 +67,9 @@ export function renderTimeline(events, roadmap, { phases = [], mechanisms = [] }
     .map(([date, text]) => `${date} ${text}`).join('\n');
 }
 
+// 申告の出来事を歩みの表示に合わせる。asked(聞いたが使っていなかった)は月1回の確認を止めるだけの記録で、表示しない。
+export const declaredEntries = (events) => events.filter((e) => e.kind !== 'asked').map((e) => ({ key: `event:${e.kind}`, date: e.date }));
+
 export const monthEvents = (events, month) => events.filter((e) => e.date.startsWith(month));
 
 export function monthlyActivity(days) {
@@ -91,7 +94,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   // 仕組みのお題と申告の出来事は手元の記録から表示のときだけ合わせる(milestones.json には書かない)
   const mechanisms = loadMechanisms();
   const shown = [...events, ...parseMechanismLog(read('.local/mechanisms.json')).map((m) => ({ key: `mechanism:${m.id}`, date: m.date })),
-    ...parseEvents(read('.local/events.json')).map((e) => ({ key: `event:${e.kind}`, date: e.date }))];
+    ...declaredEntries(parseEvents(read('.local/events.json')))];
   const labels = { phases, mechanisms };
   const thisMonth = monthEvents(shown, todayString().slice(0, 7));
   if (thisMonth.length) console.log(`今月できたこと\n${renderTimeline(thisMonth, loadRoadmap(), labels)}\n`);

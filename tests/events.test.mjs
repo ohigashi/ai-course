@@ -82,3 +82,22 @@ test('CLI: due は今月の記録がなければ はい、あれば いいえ', 
   spawnSync('node', [CLI, 'add', 'running'], { cwd: dir, encoding: 'utf8' });
   assert.equal(spawnSync('node', [CLI, 'due'], { cwd: dir, encoding: 'utf8' }).stdout.trim(), 'いいえ');
 });
+
+import { declaredEntries } from '../scripts/history.mjs';
+test('asked: 月に1回。今月 running か asked があれば確認は不要で、add も増えない', () => {
+  assert.ok(parseEvents('[{"kind":"asked","date":"2026-11-09"}]').length === 1);
+  const a = addEvent([], 'asked', '2026-11-09');
+  assert.equal(addEvent(a, 'asked', '2026-11-20').length, 1);
+  assert.equal(addEvent(a, 'running', '2026-11-20').length, 1);
+  assert.equal(addEvent(addEvent([], 'running', '2026-11-09'), 'asked', '2026-11-10').length, 1);
+  assert.equal(addEvent(a, 'asked', '2026-12-01').length, 2);
+  assert.equal(runningAskDue(a, '2026-11'), false);
+  assert.equal(runningAskDue(a, '2026-12'), true);
+});
+test('asked: CLI で記録でき、due が いいえ になる。歩みの表示には出さない', () => {
+  const dir = tempRepo();
+  const ok = spawnSync('node', [CLI, 'add', 'asked'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.equal(spawnSync('node', [CLI, 'due'], { cwd: dir, encoding: 'utf8' }).stdout.trim(), 'いいえ');
+  assert.deepEqual(declaredEntries([{ kind: 'asked', date: '2026-11-09' }, { kind: 'running', date: '2026-11-10' }]), [{ key: 'event:running', date: '2026-11-10' }]);
+});

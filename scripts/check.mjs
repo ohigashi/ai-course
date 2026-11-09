@@ -190,7 +190,7 @@ export function claudeMdStatus(repoDir, env, now = new Date()) {
   const last = env.git(['log', '-1', '--format=%H %cI', '--', 'CLAUDE.md'])?.trim();
   if (!last) return { due: false };
   const [sha, date] = last.split(' ');
-  const count = env.git(['rev-list', '--count', `${sha}..HEAD`, '--', '.', ':!course', ':!scripts', ':!.claude', ':!activity.json', ':!milestones.json', ':!progress.json', ':!challenges.json']);
+  const count = env.git(['rev-list', '--count', `${sha}..HEAD`, '--', '.', ':!course', ':!scripts', ':!.claude', ':!activity.json', ':!milestones.json', ':!works.json', ':!progress.json', ':!challenges.json']);
   const commitsSince = Number(count) || 0;
   const daysSince = Math.floor((now - new Date(date)) / DAY_MS);
   const due = (daysSince >= REVIEW_AFTER_DAYS && commitsSince >= 1) || commitsSince >= REVIEW_AFTER_COMMITS;
@@ -210,11 +210,18 @@ export function updateReminderText(output) {
 // 取り組みごとに判定するフェーズと、その段階(段階0は全体の入口なので含めない)
 const WORK_STAGES = { 1: [2], 2: [1, 3, 4, 5] };
 const NO_NEXT = '/next で次にやることを決める';
+const PHASE_DONE = 'このフェーズを終えました。次に進むフェーズを /work で選びます';
 
 function forWork(slug, check) {
   const scoped = { ...check };
-  if (check.path) scoped.path = workPath(slug, check.path);
-  if (check.dir) scoped.dir = workPath(slug, check.dir);
+  if (check.path) {
+    scoped.path = workPath(slug, check.path);
+    scoped.label = scoped.label.replace(check.path, scoped.path);
+  }
+  if (check.dir) {
+    scoped.dir = workPath(slug, check.dir);
+    scoped.label = scoped.label.replace(`${check.dir}/`, `${scoped.dir}/`);
+  }
   return scoped;
 }
 
@@ -227,11 +234,15 @@ function evaluateWork(repoDir, rules, env, work) {
     checks[phase] = { done: missing.length === 0, missing };
   }
   const own = checks[work.phase];
-  const nextAction = own?.missing[0] ?? (work.next || NO_NEXT);
+  const finished = own?.done && work.phase <= 2 && !work.redo && !work.next;
+  const nextAction = own?.missing[0] ?? (finished ? PHASE_DONE : work.next || NO_NEXT);
   return { ...work, checks, nextAction };
 }
 
-export function evaluate(repoDir, rules, env) {
+export function evaluate(repoDir, rules, rawEnv) {
+  // 同じ URL は1回の判定で1度だけ確かめる(取り組みが複数あっても通信を増やさない)
+  const seen = new Map();
+  const env = rawEnv.http ? { ...rawEnv, http: (url) => (seen.has(url) ? seen.get(url) : seen.set(url, rawEnv.http(url)).get(url)) } : rawEnv;
   const stages = rules.map((rule) => {
     const missing = rule.checks.flatMap((check) => runCheck(repoDir, check, env));
     return { id: rule.id, title: rule.title, optional: Boolean(rule.optional), done: missing.length === 0, missing };

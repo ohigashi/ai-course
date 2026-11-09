@@ -3,7 +3,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { todayString } from './activity.mjs';
-import { createEnv, evaluate, loadRules } from './check.mjs';
+import { createCliEnv, createEnv, evaluate, loadRules } from './check.mjs';
 import { WORKS_FILE, defaultWorks, parseWorks, roundCount, syncRounds } from './works.mjs';
 
 const MAX_WORKS = 20;
@@ -12,6 +12,8 @@ const PHASES = [1, 2, 3, 4];
 const STATES = ['active', 'paused'];
 // 取り組みごとに持つ文書の元になる、フェーズ1と2の判定の段階(rules.json の id)
 const DOC_STAGES = [2, 1, 3, 4, 5];
+
+const USAGE = '使い方: node scripts/work.mjs list | sync | new <名前> [--phase N] | move <slug> <N> | next <slug> <文> | pause <slug> | resume <slug> | round <slug>';
 
 const clean = (s) => (typeof s === 'string' ? s.replace(/\s+/g, ' ').trim().slice(0, NAME_LIMIT) : '');
 
@@ -32,12 +34,12 @@ export function addWork(works, name, phase, today) {
   mustPhase(phase);
   if (works.length >= MAX_WORKS) throw new Error(`取り組みは ${MAX_WORKS} 件までです。`);
   const highest = Math.max(0, ...works.map((w) => Number(/^w(\d+)$/.exec(w.slug)?.[1] ?? 0)));
-  return [...works, { slug: `w${highest + 1}`, name: clear, phase, state: 'active', next: '', rounds: [], startedAt: today, touchedAt: today }];
+  return [...works, { slug: `w${highest + 1}`, name: clear, phase, state: 'active', next: '', rounds: [], redo: false, startedAt: today, touchedAt: today }];
 }
 
 export function moveWork(works, slug, phase, today) {
   mustPhase(phase);
-  return update(works, slug, today, () => ({ phase }));
+  return update(works, slug, today, (w) => ({ phase, redo: roundCount(w, phase) >= 1 }));
 }
 
 export function setWorkNext(works, slug, text, today) {
@@ -55,7 +57,7 @@ export function closeRound(works, slug, today) {
   if (work.phase <= 2 && roundCount(work, work.phase) < 1) {
     throw new Error(`フェーズ${work.phase}は、最初の1回の判定が通るまで一区切りにできません。/next で判定を進めてください。`);
   }
-  return update(works, slug, today, (w) => ({ rounds: [...w.rounds, { phase: w.phase, date: today }] }));
+  return update(works, slug, today, (w) => ({ rounds: [...w.rounds, { phase: w.phase, date: today }], redo: false }));
 }
 
 // ---- CLI ----
@@ -91,10 +93,15 @@ function main(args) {
   const raw = existsSync(file) ? readFileSync(file, 'utf8') : null;
   const stored = parseWorks(raw);
   if (stored === null) fail(`${WORKS_FILE} が壊れています。何も書き換えていません。大東に相談してください。`);
-  const evaluated = evaluate(repoDir, loadRules(), createEnv(repoDir, { assumeInvited: true }));
+  const [cmd, ...rest] = args;
+  const needs = { move: 2, next: 2, pause: 1, resume: 1, round: 1 }[cmd];
+  if (needs && rest.length < needs) fail(`${cmd} には ${needs === 2 ? '取り組みの slug と、続く値' : '取り組みの slug'} が必要です。${USAGE}`);
+
+  // 回数を記録する sync と round は、公開先に実際に届くかも確かめる。届かないのに記録が残らないように。
+  const makeEnv = cmd === 'sync' || cmd === 'round' ? createCliEnv : createEnv;
+  const evaluated = evaluate(repoDir, loadRules(), makeEnv(repoDir, { assumeInvited: true }));
   const current = stored.length ? stored : defaultWorks(evaluated, today);
   const save = (works) => writeFileSync(file, `${JSON.stringify({ items: works }, null, 2)}\n`);
-  const [cmd, ...rest] = args;
 
   try {
     if (cmd === 'list') {
@@ -143,7 +150,7 @@ function main(args) {
         console.log(`取り組み ${w.slug} のフェーズ${w.phase}を一区切りにしました(${roundCount(w, w.phase)}回目)。`);
       }
     } else {
-      fail('使い方: node scripts/work.mjs list | sync | new <名前> [--phase N] | move <slug> <N> | next <slug> <文> | pause <slug> | resume <slug> | round <slug>');
+      fail(USAGE);
     }
   } catch (error) {
     fail(error.message);

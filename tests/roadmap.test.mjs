@@ -15,7 +15,7 @@ test('ロードマップに参加の条件は残らない', () => {
   assert.ok(loadRoadmap().every((s) => !('availableAfter' in s)));
 });
 test('地図: 4つを並べ、各フェーズの下に進めている取り組みをすべて出す', () => {
-  const works = [w({}), w({ slug: 'w2', name: '週次レポート', phase: 1, nextAction: '比べる', rounds: [{ phase: 1, date: 'd' }, { phase: 1, date: 'e' }] })];
+  const works = [w({}), w({ slug: 'w2', name: '週次レポート', phase: 1, nextAction: '比べる', redo: true, rounds: [{ phase: 1, date: 'd' }, { phase: 1, date: 'e' }] })];
   const lines = renderRoadmap({ ...base, works }, P, none).split('\n');
   assert.equal(lines[0], '1 作ってみる(これまで 2回)');
   assert.equal(lines[1], '    週次レポート(3回目)');
@@ -69,4 +69,12 @@ test('画面の下の1行: 進めている取り組みがない', () => {
 });
 test('画面の下の1行: 環境づくりが未完', () => {
   assert.equal(statusLine({ ...base, setupDone: false, works: [], stages: [{ id: 0, done: false, missing: ['CLAUDE.md を書く'] }], currentStage: 0 }, P), 'はじめに | 次: CLAUDE.md を書く');
+});
+
+test('地図: フェーズ1と2の(N回目)は redo のときだけ。3と4は回数があれば出す', () => {
+  const lines = (over) => renderRoadmap({ ...base, works: [w({ phase: 1, rounds: [{ phase: 1, date: 'd' }], ...over })] }, P, none).split('\n');
+  assert.equal(lines({})[1], '    証憑消込の改善');
+  assert.equal(lines({ redo: true })[1], '    証憑消込の改善(2回目)');
+  const p3 = renderRoadmap({ ...base, works: [w({ phase: 3, rounds: [{ phase: 3, date: 'd' }] })] }, P, none).split('\n');
+  assert.ok(p3.includes('    証憑消込の改善(2回目)'));
 });

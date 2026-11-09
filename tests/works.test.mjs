@@ -93,3 +93,10 @@ test('worksOutcome: main と各取り組みの作ったものと減らした時�
   assert.equal(out.monthlySavedHours, 3);
   assert.deepEqual(worksOutcome(dir, [], { listFiles, readRepoFile, parseSavings }).made, ['a.txt']);
 });
+
+test('redo: true のときだけ残し、既定は false。defaultWorks も false', () => {
+  const parse = (redo) => parseWorks(JSON.stringify({ items: [{ ...base, redo }] }))[0].redo;
+  assert.equal(parse(true), true);
+  for (const v of [false, 'true', 1, undefined, null]) assert.equal(parse(v), false);
+  assert.equal(defaultWorks(done(0, 2, 1), '2026-11-09')[0].redo, false);
+});

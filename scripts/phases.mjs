@@ -23,6 +23,11 @@ function leadingWork(works) {
 }
 
 export function nextActionOf(result) {
+  // 環境づくりが先。終わるまでは取り組みの次にやることより優先する。
+  if (result.setupDone === false || result.currentStage === 0) {
+    const first = result.stages.find((s) => s.id === 0)?.missing[0];
+    if (first) return first;
+  }
   const work = leadingWork(result.works);
   const own = work?.nextAction ?? work?.next;
   if (own) return own;
