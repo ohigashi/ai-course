@@ -5,7 +5,7 @@ description: 課題解決とプロダクトコースの課題を選び、節目�
 
 # /challenge
 
-1. `node scripts/check.mjs` の結果で「小さな自動化」と「課題の洗い出し」を終えていなければ、その2つを終えたあとから始められることを伝えて終える。`node scripts/challenge.mjs status` で、いまのレベルと選べる課題を確かめる(`.local/` の除外もここで設定される)。`current` が null ならすべて終えたことを伝える
+1. `node scripts/check.mjs` の結果で環境づくりを終えていなければ、先に環境づくりを終えることを伝えて終える。`node scripts/challenge.mjs status` で、いまのレベルと選べる課題を確かめる(`.local/` の除外もここで設定される)。`current` が null ならすべて終えたことを伝える
 2. 課題を受講者に選んでもらい、`course/challenges/` の該当ファイルを読んで示す
 3. 記録のファイル `.local/challenges/<課題の id>/process.md` を用意する。`git ls-files .local` に何か表示されたら、書かずに大東への相談を伝えて終える
 4. 次の節目ごとに短く問いかけ、受講者の答えを日付つきでそのまま追記する。代わりに考えて書かない
