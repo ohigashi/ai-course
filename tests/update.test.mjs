@@ -41,23 +41,47 @@ function setup() {
 
 const run = (cwd, url, ...args) => spawnSync(process.execPath, [script, ...args], { cwd, encoding: 'utf8', env: { ...process.env, AI_COURSE_REMOTE: url } });
 
-test('教材は更新され、受講者のファイルは変わらない', () => {
+const shaOf = (stdout) => stdout.match(/版: ([0-9a-f]{40})/)?.[1];
+
+test('確認だけでは何も書き換えず、版と変更されるファイルを示す', () => {
   const { upstream, learner } = setup();
   const r = run(learner, upstream);
   assert.equal(r.status, 0);
-  assert.equal(readFileSync(join(learner, 'course/stage-0.md'), 'utf8'), '新しい教材');
-  assert.equal(existsSync(join(learner, '.claude/skills/next/SKILL.md')), false);
+  assert.equal(readFileSync(join(learner, 'course/stage-0.md'), 'utf8'), '古い教材');
   assert.equal(existsSync(join(learner, 'scripts/x.mjs')), false);
-  assert.ok(r.stdout.includes('仕組みの更新があります'));
-  assert.ok(r.stdout.includes('scripts/x.mjs'));
+  assert.ok(r.stdout.includes('更新があります'));
+  assert.ok(shaOf(r.stdout));
+  assert.match(r.stdout, /course\/stage-0\.md/);
+  assert.match(r.stdout, /scripts\/x\.mjs/);
+});
+
+test('了承した版だけを適用し、受講者のファイルは変わらない', () => {
+  const { upstream, learner } = setup();
+  const sha = shaOf(run(learner, upstream).stdout);
+  write(upstream, 'course/stage-0.md', 'さらに新しい教材');
+  git(upstream, 'add', '-A');
+  git(upstream, 'commit', '-q', '-m', 'next');
+  const r = run(learner, upstream, `--apply=${sha}`);
+  assert.equal(r.status, 0);
+  assert.equal(readFileSync(join(learner, 'course/stage-0.md'), 'utf8'), '新しい教材');
+  assert.equal(readFileSync(join(learner, 'scripts/x.mjs'), 'utf8'), '// new');
+  assert.equal(readFileSync(join(learner, '.claude/skills/next/SKILL.md'), 'utf8'), 'new skill');
   assert.equal(readFileSync(join(learner, 'CLAUDE.md'), 'utf8'), '受講者の CLAUDE');
   assert.equal(readFileSync(join(learner, 'docs/01-tasks.md'), 'utf8'), '受講者の棚卸し');
 });
 
-test('2回続けて実行しても成功する', () => {
+test('適用のあとは最新と表示する', () => {
   const { upstream, learner } = setup();
-  assert.equal(run(learner, upstream).status, 0);
-  assert.equal(run(learner, upstream).status, 0);
+  run(learner, upstream, `--apply=${shaOf(run(learner, upstream).stdout)}`);
+  assert.ok(run(learner, upstream).stdout.includes('最新です'));
+});
+
+test('版の形式が正しくなければ適用しない', () => {
+  const { upstream, learner } = setup();
+  run(learner, upstream);
+  const r = run(learner, upstream, '--apply=course/main');
+  assert.equal(r.status, 0);
+  assert.equal(readFileSync(join(learner, 'course/stage-0.md'), 'utf8'), '古い教材');
 });
 
 test('リモートに届かなくても終了コード 0 で手元の版を案内する', () => {
@@ -65,14 +89,4 @@ test('リモートに届かなくても終了コード 0 で手元の版を案�
   const r = run(learner, join(tmpdir(), 'no-such-repo-xyz'));
   assert.equal(r.status, 0);
   assert.ok(r.stdout.includes('手元の版で続けます'));
-  assert.equal(readFileSync(join(learner, 'course/stage-0.md'), 'utf8'), '古い教材');
-});
-
-test('確認のあと --apply-code でスクリプトとスキルも更新する', () => {
-  const { upstream, learner } = setup();
-  const r = run(learner, upstream, '--apply-code');
-  assert.equal(r.status, 0);
-  assert.equal(readFileSync(join(learner, 'scripts/x.mjs'), 'utf8'), '// new');
-  assert.equal(readFileSync(join(learner, '.claude/skills/next/SKILL.md'), 'utf8'), 'new skill');
-  assert.equal(readFileSync(join(learner, 'CLAUDE.md'), 'utf8'), '受講者の CLAUDE');
 });
