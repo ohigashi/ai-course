@@ -33,6 +33,10 @@ export function markMechanismDone(log, id, today, catalog) {
 function main(args) {
   const catalog = loadMechanisms();
   const [cmd, id] = args;
+  if ((cmd === 'list' || (cmd === 'done' && id)) && localDirIsTracked()) {
+    console.log(`${LOCAL_DIR}/ の内容が GitHub の管理に入っています。記録を止めて、大東に相談してください。`);
+    return 1;
+  }
   if (cmd === 'list') {
     const done = new Map(parseMechanismLog(existsSync(LOG_FILE) ? readFileSync(LOG_FILE, 'utf8') : null).map((e) => [e.id, e.date]));
     for (const m of catalog) console.log(`フェーズ${m.phase} ${m.id} ${m.title}${done.has(m.id) ? ` (済 ${done.get(m.id)})` : ''}\n  ${m.prompt}`);
@@ -40,10 +44,6 @@ function main(args) {
   }
   if (cmd === 'done' && id) {
     if (!catalog.some((m) => m.id === id)) { console.log(`知らないお題です: ${id}。node scripts/mechanism.mjs list で確かめてください。`); return 1; }
-    if (localDirIsTracked()) {
-      console.log(`${LOCAL_DIR}/ の内容が GitHub の管理に入っています。記録を止めて、大東に相談してください。`);
-      return 1;
-    }
     ensureLocalExcluded();
     mkdirSync(LOCAL_DIR, { recursive: true });
     const log = parseMechanismLog(existsSync(LOG_FILE) ? readFileSync(LOG_FILE, 'utf8') : null);

@@ -53,3 +53,15 @@ test('CLI: 追跡されていなければ .local/mechanisms.json に記録し、
   const bad = spawnSync('node', [CLI, 'done', 'zzz'], { cwd: dir, encoding: 'utf8' });
   assert.notEqual(bad.status, 0);
 });
+test('CLI: .local が追跡されていると list も止まる', () => {
+  const dir = tempRepo();
+  mkdirSync(join(dir, '.local'));
+  writeFileSync(join(dir, '.local', 'x'), 'x');
+  git(dir, 'add', '.local/x');
+  git(dir, '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', 'x');
+  const r = spawnSync('node', [CLI, 'list'], { cwd: dir, encoding: 'utf8' });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /GitHub の管理に入っています/);
+  const ok = spawnSync('node', [CLI, 'list'], { cwd: tempRepo(), encoding: 'utf8' });
+  assert.equal(ok.status, 0);
+});

@@ -115,7 +115,7 @@ export function nextStepOf(member) {
 }
 
 const RECENT_LIMIT = 3;
-const AUTOMATIC_SUBJECTS = new Set([AUTO_SUBJECT, '歩みの更新']);
+const AUTOMATIC_SUBJECTS = new Set([AUTO_SUBJECT, '歩みの更新', '活用の記録']);
 
 // commit の件名を「日時<TAB>件名」の行から読む。自動の保存は動きに数えない。
 export function recentMoves(log) {

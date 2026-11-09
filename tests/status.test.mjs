@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadPhases, phaseOfStage } from '../scripts/phases.mjs';
-import { renderPage, selectInvitations, quietMembers, problemOf, loadMembers, parseShare, renderTeamMd, teamInviteTargets, selectTeamInvitation, shouldSyncTeam, collectStatuses, teamRemoveTargets } from '../scripts/status.mjs';
+import { recentMoves, renderPage, selectInvitations, quietMembers, problemOf, loadMembers, parseShare, renderTeamMd, teamInviteTargets, selectTeamInvitation, shouldSyncTeam, collectStatuses, teamRemoveTargets } from '../scripts/status.mjs';
 
 const result = (currentStage, lastCommitDate = '2026-11-09T10:00:00+09:00') => ({
   stages: [
@@ -249,4 +249,9 @@ test('parseShare: 節目の掲載は明示の了承だけ', () => {
 test('運営のページ: 作ったものと減らした時間の変化を示す', () => {
   const a = { ...member('中村', 'n', 1), outcome: { made: [], monthlySavedHours: 0 }, snapshots: [{ month: '2026-11', made: 3, savedHours: 6 }] };
   assert.ok(renderPage([a]).includes('作ったもの 3件'));
+});
+
+test('recentMoves: 自動の保存と活用の記録は除き、作業の件名は残す', () => {
+  const log = ['2026-11-09T10:00:00\t活用の記録', '2026-11-09T09:00:00\t歩みの更新', '2026-11-08T09:00:00\t議事録の自動化を作った'].join('\n');
+  assert.deepEqual(recentMoves(log).map((m) => m.subject), ['議事録の自動化を作った']);
 });

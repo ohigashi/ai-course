@@ -28,6 +28,7 @@ export function phaseMarks(result, phases) {
     if (finished) mark = '済';
     else if (current && p.id === current.id) mark = '今';
     else if (open) mark = '可';
+    if (mark === '済') note = '';
     return { id: p.id, title: p.title, learn: p.learn, mark, note };
   });
 }

@@ -33,3 +33,8 @@ test('nextActionOf: 残りの先頭、全部終えたら /challenge、それも�
   assert.equal(nextActionOf(r(null, [0,1,2,3,4,5])), '/challenge で次の課題に取り組む');
   assert.match(nextActionOf(r(null, [0,1,2,3,4,5,7])), /^フェーズ1と2を終えました/);
 });
+test('phaseMarks: 済のフェーズには補足を付けない', () => {
+  const four = phaseMarks(r(null, [0,1,2,3,4,5,6,7]), P)[3];
+  assert.equal(four.mark, '済');
+  assert.equal(four.note, '');
+});
