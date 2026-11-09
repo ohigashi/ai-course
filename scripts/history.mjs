@@ -9,6 +9,7 @@ import { loadRoadmap } from './roadmap.mjs';
 import { loadPhases } from './phases.mjs';
 import { roundCount, worksOutcome } from './works.mjs';
 import { loadMechanisms, parseMechanismLog } from './mechanism.mjs';
+import { parseEvents } from './events.mjs';
 
 const MILESTONES_FILE = 'milestones.json';
 
@@ -53,13 +54,17 @@ function label(key, { roadmap, phases, mechanisms }) {
   if (type === 'stage') return `${roadmap.find((s) => String(s.id) === value)?.title ?? ''} を終えた`.trim();
   if (type === 'level') return `課題解決 レベル${value} を終えた`;
   if (type === 'phase-done') return `フェーズ${value} ${phases.find((p) => String(p.id) === value)?.title ?? ''} を終えた`.replace('  ', ' ');
-  return `仕組みのお題「${mechanisms.find((m) => m.id === value)?.title ?? value}」を解いた`;
+  if (type === 'mechanism') return `仕組みのお題「${mechanisms.find((m) => m.id === value)?.title ?? value}」を解いた`;
+  if (type === 'event' && value === 'delegated') return '仕事をAIに任せた';
+  if (type === 'event' && value === 'running') return '作ったものが今月も動いている';
+  return null;
 }
 
 // 旧 phase:* は表示しない。mechanisms は題名を引くための一覧(course/mechanisms.json)。
 export function renderTimeline(events, roadmap, { phases = [], mechanisms = [] } = {}) {
   return events.filter((e) => !e.key.startsWith('phase:')).sort((a, b) => a.date.localeCompare(b.date))
-    .map((e) => `${e.date} ${label(e.key, { roadmap, phases, mechanisms })}`).join('\n');
+    .map((e) => [e.date, label(e.key, { roadmap, phases, mechanisms })]).filter(([, text]) => text !== null)
+    .map(([date, text]) => `${date} ${text}`).join('\n');
 }
 
 export const monthEvents = (events, month) => events.filter((e) => e.date.startsWith(month));
@@ -83,9 +88,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const outcome = worksOutcome(repoDir, result.works, { listFiles, readRepoFile, parseSavings });
   const snapshots = syncSnapshots(parseSnapshots(current), todayString().slice(0, 7), outcome.made.length, outcome.monthlySavedHours);
   writeFileSync(MILESTONES_FILE, `${JSON.stringify({ events, snapshots }, null, 2)}\n`);
-  // 仕組みのお題は手元の記録から表示のときだけ合わせる(milestones.json には書かない)
+  // 仕組みのお題と申告の出来事は手元の記録から表示のときだけ合わせる(milestones.json には書かない)
   const mechanisms = loadMechanisms();
-  const shown = [...events, ...parseMechanismLog(read('.local/mechanisms.json')).map((m) => ({ key: `mechanism:${m.id}`, date: m.date }))];
+  const shown = [...events, ...parseMechanismLog(read('.local/mechanisms.json')).map((m) => ({ key: `mechanism:${m.id}`, date: m.date })),
+    ...parseEvents(read('.local/events.json')).map((e) => ({ key: `event:${e.kind}`, date: e.date }))];
   const labels = { phases, mechanisms };
   const thisMonth = monthEvents(shown, todayString().slice(0, 7));
   if (thisMonth.length) console.log(`今月できたこと\n${renderTimeline(thisMonth, loadRoadmap(), labels)}\n`);
