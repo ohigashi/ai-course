@@ -1,0 +1,10 @@
+# 顧客データ、財務の実データ、鍵は置かない
+.env*
+*.csv
+*.xlsx
+*.xls
+data/
+private/
+node_modules/
+out/
+.DS_Store

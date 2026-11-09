@@ -1,0 +1,25 @@
+[
+  {
+    "id": 0,
+    "title": "環境づくり",
+    "checks": [
+      { "type": "file", "path": "CLAUDE.md", "minChars": 200, "label": "CLAUDE.md を自分の言葉で書く" },
+      { "type": "pushed", "label": "変更を GitHub に push する" },
+      { "type": "invited", "github": "ohigashi", "label": "大東をリポジトリに招待する" }
+    ]
+  },
+  {
+    "id": 1,
+    "title": "課題の洗い出し",
+    "checks": [
+      { "type": "timed_items", "path": "docs/01-tasks.md", "min": 3, "label": "docs/01-tasks.md に業務を3件以上、かかる時間つきで書く" },
+      {
+        "type": "headings",
+        "path": "docs/01-problem.md",
+        "headings": ["誰の", "何が困っているか", "いまどうしているか", "どうなればよいか"],
+        "minChars": 10,
+        "label": "docs/01-problem.md を書く"
+      }
+    ]
+  }
+]
