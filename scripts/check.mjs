@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, lstatSync, realpathSync } from 'node:fs';
 import { join, dirname, relative, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { loadRoadmap, renderRoadmap } from './roadmap.mjs';
 
 const TEMPLATE_MARK = '<!-- template -->';
 const COURSE_PATHS = ['course/', 'scripts/', '.claude/'];
@@ -165,5 +166,6 @@ export function loadRules() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const repoDir = dirname(dirname(fileURLToPath(import.meta.url)));
   const env = createEnv(repoDir, { assumeInvited: process.argv.includes('--assume-invited') });
-  process.stdout.write(`${JSON.stringify(evaluate(repoDir, loadRules(), env), null, 2)}\n`);
+  const result = evaluate(repoDir, loadRules(), env);
+  process.stdout.write(`${JSON.stringify({ ...result, roadmap: renderRoadmap(result, loadRoadmap()) }, null, 2)}\n`);
 }

@@ -3,9 +3,16 @@
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "node scripts/session-reminder.mjs" }
+          {
+            "type": "command",
+            "command": "node scripts/session-reminder.mjs"
+          }
         ]
       }
     ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "node scripts/statusline.mjs"
   }
 }

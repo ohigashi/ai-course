@@ -23,7 +23,6 @@ function setup() {
   write(upstream, 'course/stage-0.md', '新しい教材');
   write(upstream, 'scripts/x.mjs', '// new');
   write(upstream, '.claude/skills/next/SKILL.md', 'new skill');
-  write(upstream, '.claude/settings.json', '{"new":true}');
   write(upstream, 'CLAUDE.md', 'テンプレートの CLAUDE');
   write(upstream, 'docs/01-tasks.md', 'テンプレートの棚卸し');
   git(upstream, 'add', '-A');
@@ -67,7 +66,6 @@ test('了承した版だけを適用し、受講者のファイルは変わら�
   assert.equal(readFileSync(join(learner, 'course/stage-0.md'), 'utf8'), '新しい教材');
   assert.equal(readFileSync(join(learner, 'scripts/x.mjs'), 'utf8'), '// new');
   assert.equal(readFileSync(join(learner, '.claude/skills/next/SKILL.md'), 'utf8'), 'new skill');
-  assert.equal(readFileSync(join(learner, '.claude/settings.json'), 'utf8'), '{"new":true}');
   assert.equal(readFileSync(join(learner, 'CLAUDE.md'), 'utf8'), '受講者の CLAUDE');
   assert.equal(readFileSync(join(learner, 'docs/01-tasks.md'), 'utf8'), '受講者の棚卸し');
 });
@@ -91,4 +89,36 @@ test('リモートに届かなくても終了コード 0 で手元の版を案�
   const r = run(learner, join(tmpdir(), 'no-such-repo-xyz'));
   assert.equal(r.status, 0);
   assert.ok(r.stdout.includes('手元の版で続けます'));
+});
+
+const readSettings = (dir) => JSON.parse(readFileSync(join(dir, '.claude/settings.json'), 'utf8'));
+const reminder = 'node scripts/session-reminder.mjs';
+
+test('設定は決まった項目だけを追加し、受講者の設定を残す', () => {
+  const { upstream, learner } = setup();
+  write(learner, '.claude/settings.json', JSON.stringify({ permissions: { allow: ['Bash(ls)'] }, hooks: { SessionStart: [{ hooks: [{ type: 'command', command: 'node mine.mjs' }] }] } }));
+  const check = run(learner, upstream);
+  assert.match(check.stdout, /\.claude\/settings\.json/);
+  run(learner, upstream, `--apply=${shaOf(check.stdout)}`);
+  const s = readSettings(learner);
+  assert.deepEqual(s.permissions, { allow: ['Bash(ls)'] });
+  const commands = s.hooks.SessionStart.flatMap((e) => e.hooks.map((h) => h.command));
+  assert.ok(commands.includes('node mine.mjs'));
+  assert.ok(commands.includes(reminder));
+  assert.equal(s.statusLine.command, 'node scripts/statusline.mjs');
+});
+
+test('設定の追加は2回行っても重複しない', () => {
+  const { upstream, learner } = setup();
+  const sha = shaOf(run(learner, upstream).stdout);
+  run(learner, upstream, `--apply=${sha}`);
+  run(learner, upstream, `--apply=${sha}`);
+  assert.equal(readSettings(learner).hooks.SessionStart.flatMap((e) => e.hooks).filter((h) => h.command === reminder).length, 1);
+});
+
+test('壊れた設定ファイルは書き換えない', () => {
+  const { upstream, learner } = setup();
+  write(learner, '.claude/settings.json', '{ broken');
+  run(learner, upstream, `--apply=${shaOf(run(learner, upstream).stdout)}`);
+  assert.equal(readFileSync(join(learner, '.claude/settings.json'), 'utf8'), '{ broken');
 });
