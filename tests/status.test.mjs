@@ -17,35 +17,35 @@ const result = (currentStage, lastCommitDate = '2026-11-09T10:00:00+09:00') => (
 const member = (name, github, currentStage, problem = null, date) => ({ name, github, repo: `${github}/ai-course-x`, result: result(currentStage, date), problem });
 
 test('並びは名前順で固定され、進み具合に左右されない', () => {
-  const a = member('中村', 'nakamura', 0);
-  const b = member('鈴木', 'suzuki', null);
+  const a = member('受講者A', 'nakamura', 0);
+  const b = member('受講者B', 'suzuki', null);
   const one = renderPage([a, b]);
   const two = renderPage([b, a]);
   assert.equal(one, two);
-  assert.ok(one.indexOf('中村') < one.indexOf('鈴木'));
+  assert.ok(one.indexOf('受講者A') < one.indexOf('受講者B'));
 });
 
 test('課題の文は HTML エスケープする', () => {
-  const html = renderPage([member('中村', 'nakamura', 1, '<script>alert(1)</script>')]);
+  const html = renderPage([member('受講者A', 'nakamura', 1, '<script>alert(1)</script>')]);
   assert.ok(!html.includes('<script>alert'));
   assert.ok(html.includes('&lt;script&gt;'));
 });
 
 test('動きがない人の表示はページに含まれない', () => {
-  const html = renderPage([member('中村', 'nakamura', 1, null, '2026-10-01T10:00:00+09:00')]);
+  const html = renderPage([member('受講者A', 'nakamura', 1, null, '2026-10-01T10:00:00+09:00')]);
   assert.ok(!html.includes('2週間'));
   assert.ok(!html.includes('声をかける'));
 });
 
 test('フェーズごとの人数を示す', () => {
-  const html = renderPage([member('中村', 'nakamura', 1), member('鈴木', 'suzuki', 1), member('大東', 'ohigashi', null)]);
+  const html = renderPage([member('受講者A', 'nakamura', 1), member('受講者B', 'suzuki', 1), member('大東', 'ohigashi', null)]);
   const P = loadPhases();
   assert.match(html, new RegExp(`${phaseOfStage(1, P).title}[^<]*</td>\\s*<td[^>]*>2人`));
   assert.match(html, new RegExp(`${phaseOfStage(null, P).title}[^<]*</td>\\s*<td[^>]*>1人`));
   assert.ok(html.includes('フェーズごとの人数'));
 });
 test('一覧: 不明な段階の番号でも落とさず取得できませんでしたと出す', () => {
-  assert.ok(renderPage([member('中村', 'n', 999)]).includes('取得できませんでした'));
+  assert.ok(renderPage([member('受講者A', 'n', 999)]).includes('取得できませんでした'));
 });
 
 test('メンバーの招待だけを承諾の対象にする', () => {
@@ -53,17 +53,17 @@ test('メンバーの招待だけを承諾の対象にする', () => {
     { id: 1, inviter: { login: 'nakamura-x' } },
     { id: 2, inviter: { login: 'stranger' } },
   ];
-  assert.deepEqual(selectInvitations(invitations, [{ github: 'nakamura-x', name: '中村' }]).map((i) => i.id), [1]);
+  assert.deepEqual(selectInvitations(invitations, [{ github: 'nakamura-x', name: '受講者A' }]).map((i) => i.id), [1]);
   assert.deepEqual(selectInvitations(invitations, []), []);
 });
 
 test('2週間以上 commit がない人を返す', () => {
   const now = new Date('2026-11-20T00:00:00+09:00');
   const list = quietMembers([
-    member('中村', 'n', 1, null, '2026-11-01T00:00:00+09:00'),
-    member('鈴木', 's', 1, null, '2026-11-15T00:00:00+09:00'),
+    member('受講者A', 'n', 1, null, '2026-11-01T00:00:00+09:00'),
+    member('受講者B', 's', 1, null, '2026-11-15T00:00:00+09:00'),
   ], now);
-  assert.deepEqual(list.map((m) => m.name), ['中村']);
+  assert.deepEqual(list.map((m) => m.name), ['受講者A']);
 });
 
 test('「何が困っているか」の本文を取り出す。CRLF でも読める', () => {
@@ -72,7 +72,7 @@ test('「何が困っているか」の本文を取り出す。CRLF でも読め
 });
 
 test('リポジトリがまだない人は開始前と表示する', () => {
-  const html = renderPage([{ name: '鈴木', github: 's', repo: null, result: null, problem: null }]);
+  const html = renderPage([{ name: '受講者B', github: 's', repo: null, result: null, problem: null }]);
   assert.ok(html.includes('開始前'));
 });
 
@@ -84,8 +84,8 @@ test('メンバーは手元のファイルから読み、無ければ空にす�
 });
 
 test('成果: 作ったもの、減らした時間、公開URLと月の合計を示し、本人の記録と添える', () => {
-  const a = { ...member('中村', 'n', 1), outcome: { made: ['report.py'], monthlySavedHours: 6, url: 'https://example.com/<x>', stepups: 1 } };
-  const b = { ...member('鈴木', 's', 1), outcome: { made: [], monthlySavedHours: 2.5, url: null, stepups: 0 } };
+  const a = { ...member('受講者A', 'n', 1), outcome: { made: ['report.py'], monthlySavedHours: 6, url: 'https://example.com/<x>', stepups: 1 } };
+  const b = { ...member('受講者B', 's', 1), outcome: { made: [], monthlySavedHours: 2.5, url: null, stepups: 0 } };
   const html = renderPage([a, b]);
   assert.ok(html.includes('report.py'));
   assert.ok(html.includes('8.5時間'));
@@ -113,12 +113,12 @@ test('parseShare: 文は1行にして長さを制限する', () => {
 });
 
 test('TEAM.md: 了承した人だけを名前順で載せ、合計も了承した人だけで計算する', () => {
-  const a = { ...member('鈴木', 's', 1), share: shareOf(), outcome: { made: ['secret-client.py', 'b'], monthlySavedHours: 2 } };
-  const b = { ...member('中村', 'n', 0), share: shareOf({ problem: '営業資料の更新' }), outcome: { made: [], monthlySavedHours: 3 } };
+  const a = { ...member('受講者B', 's', 1), share: shareOf(), outcome: { made: ['secret-client.py', 'b'], monthlySavedHours: 2 } };
+  const b = { ...member('受講者A', 'n', 0), share: shareOf({ problem: '営業資料の更新' }), outcome: { made: [], monthlySavedHours: 3 } };
   const c = { ...member('非共有', 'x', 1), share: shareOf({ share: false, problem: '見せない課題' }), outcome: { made: [], monthlySavedHours: 100 } };
   const d = { ...member('未回答', 'y', 1), share: null, outcome: { made: [], monthlySavedHours: 50 } };
   const md = renderTeamMd([a, c, d, b]);
-  assert.ok(md.indexOf('中村') < md.indexOf('鈴木'));
+  assert.ok(md.indexOf('受講者A') < md.indexOf('受講者B'));
   assert.ok(!md.includes('非共有') && !md.includes('見せない課題') && !md.includes('未回答'));
   assert.ok(md.includes('5時間'));
   assert.ok(!md.includes('105時間'));
@@ -168,8 +168,8 @@ test('1人の取得に失敗しても他の人を集計し、失敗した人は�
 });
 
 test('TEAM.md: 活用日数はチームの合計だけで、個人別には出さない', () => {
-  const a = { ...member('中村', 'n', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 4 } };
-  const b = { ...member('鈴木', 's', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 3 } };
+  const a = { ...member('受講者A', 'n', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 4 } };
+  const b = { ...member('受講者B', 's', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 3 } };
   const c = { ...member('非共有', 'x', 1), share: shareOf({ share: false }), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 5 } };
   const d = { ...member('大東', 'o', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 1 } };
   const md = renderTeamMd([a, b, c, d]);
@@ -179,7 +179,7 @@ test('TEAM.md: 活用日数はチームの合計だけで、個人別には出�
 });
 
 test('TEAM.md: 本人が選んだ効いた使い方と、いまのフェーズを載せる', () => {
-  const a = { ...member('中村', 'n', 1), share: { ...shareOf(), tips: ['資料と台本を一緒に渡す'] }, phase: '試す', outcome: { made: [], monthlySavedHours: 0 } };
+  const a = { ...member('受講者A', 'n', 1), share: { ...shareOf(), tips: ['資料と台本を一緒に渡す'] }, phase: '試す', outcome: { made: [], monthlySavedHours: 0 } };
   const md = renderTeamMd([a]);
   assert.ok(md.includes('資料と台本を一緒に渡す'));
   assert.ok(md.includes(`- いまのフェーズ: ${phaseOfStage(1, loadPhases()).title}`));
@@ -204,14 +204,14 @@ test('チームから外す対象: どちらもやめた人だけで、未回答
 });
 
 test('運営のページ: 人別の活用日数と月別の推移を出さない', () => {
-  const a = { ...member('中村', 'n', 1), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 4, monthDays: 9 }, milestones: [{ key: 'stage:0', date: '2026-11-09' }], months: [{ month: '2026-11', days: 12 }] };
+  const a = { ...member('受講者A', 'n', 1), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 4, monthDays: 9 }, milestones: [{ key: 'stage:0', date: '2026-11-09' }], months: [{ month: '2026-11', days: 12 }] };
   const html = renderPage([a]);
   assert.ok(!html.includes('週 4日') && !html.includes('今月 9日') && !html.includes('12日'));
   assert.ok(html.includes('2026-11-09'));
   assert.ok(html.includes('フェーズごとの人数'));
 });
 test('一覧: 古い版の受講者でも段階の番号から今のフェーズが出る', () => {
-  const a = { ...member('中村', 'n', 1), phase: '仕組みとして実装する', outcome: { made: [], monthlySavedHours: 0 } };
+  const a = { ...member('受講者A', 'n', 1), phase: '仕組みとして実装する', outcome: { made: [], monthlySavedHours: 0 } };
   const html = renderPage([a]);
   assert.ok(html.includes(phaseOfStage(1, loadPhases()).title));
   assert.ok(!html.includes('仕組みとして実装する'));
@@ -226,14 +226,14 @@ test('チームから外すのは、両方を false と明示した人だけ', (
 });
 
 test('TEAM.md: いまのフェーズを1行で示し、活用の位置を出さない', () => {
-  const a = { ...member('中村', 'n', 1), share: shareOf(), phase: '継続される', outcome: { made: [], monthlySavedHours: 0 } };
+  const a = { ...member('受講者A', 'n', 1), share: shareOf(), phase: '継続される', outcome: { made: [], monthlySavedHours: 0 } };
   const md = renderTeamMd([a]);
   assert.ok(md.includes(`- いまのフェーズ: ${phaseOfStage(1, loadPhases()).title}`));
   assert.ok(!md.includes('継続される') && !md.includes('いまの段階'));
 });
 
 test('TEAM.md: 了承者の節目の日付を載せ、活用の推移は載せない', () => {
-  const a = { ...member('中村', 'n', 1), share: shareOf({ milestones: true }), outcome: { made: [], monthlySavedHours: 0 }, milestones: [{ key: 'level:1', date: '2026-11-10' }, { key: 'phase:継続される', date: '2026-11-11' }], months: [{ month: '2026-11', days: 12 }] };
+  const a = { ...member('受講者A', 'n', 1), share: shareOf({ milestones: true }), outcome: { made: [], monthlySavedHours: 0 }, milestones: [{ key: 'level:1', date: '2026-11-10' }, { key: 'phase:継続される', date: '2026-11-11' }], months: [{ month: '2026-11', days: 12 }] };
   const md = renderTeamMd([a]);
   assert.ok(!renderTeamMd([{ ...a, share: shareOf() }]).includes('2026-11-10'));
   assert.ok(md.includes('2026-11-10') && md.includes('課題解決 レベル1'));
@@ -247,7 +247,7 @@ test('parseShare: 節目の掲載は明示の了承だけ', () => {
 });
 
 test('運営のページ: 作ったものと減らした時間の変化を示す', () => {
-  const a = { ...member('中村', 'n', 1), outcome: { made: [], monthlySavedHours: 0 }, snapshots: [{ month: '2026-11', made: 3, savedHours: 6 }] };
+  const a = { ...member('受講者A', 'n', 1), outcome: { made: [], monthlySavedHours: 0 }, snapshots: [{ month: '2026-11', made: 3, savedHours: 6 }] };
   assert.ok(renderPage([a]).includes('作ったもの 3件'));
 });
 

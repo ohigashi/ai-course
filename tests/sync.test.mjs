@@ -77,7 +77,7 @@ test('applyProgress: 本人の判定が無ければ運営側の判定のまま',
   assert.deepEqual(applyProgress(result(null), null), result(null));
 });
 
-const member = (over = {}) => ({ name: '中村', github: 'n', repo: 'n/x', result: result(5), problem: null, ...over });
+const member = (over = {}) => ({ name: '受講者A', github: 'n', repo: 'n/x', result: result(5), problem: null, ...over });
 
 test('次の一歩: 更新待ちの人には更新の取り込みを先に案内する', () => {
   assert.equal(nextStepOf(member({ courseBehind: true })), 'コースの更新を /next で取り込む');
