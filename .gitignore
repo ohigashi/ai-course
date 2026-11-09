@@ -8,3 +8,4 @@ private/
 node_modules/
 out/
 .DS_Store
+members.local.json

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, writeFileSync, mkdirSync, cpSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync, cpSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,10 +35,10 @@ test('ひな形のままでは段階0も1も未完了', () => {
 
 test('記入済みの見本では段階0と1のファイルの条件を満たす', () => {
   const dir = templateCopy();
-  writeFileSync(join(dir, 'CLAUDE.md'), '# 自分のこと\n' + '経理と総務を担当しています。月末の集計を早くしたいと考えています。'.repeat(8));
+  writeFileSync(join(dir, 'CLAUDE.md'), ['仕事と役割', 'AIに任せたいこと', '文章や報告の好み', '確認してほしいタイミング', '大切にしている判断の基準'].map((h) => `## ${h}\n経理と総務の仕事について自分の言葉で書きました\n`).join('\n'));
   writeFileSync(join(dir, 'docs/01-tasks.md'), '- 売上の集計 2時間\n- 請求書の作成 30分\n- 議事録 1時間半\n');
   writeFileSync(join(dir, 'docs/01-problem.md'), [
-    '## 誰の', '経理を担当する自分自身の', '',
+    '## 誰の', '自分', '',
     '## 何が困っているか', '月末の売上の集計に毎回2時間かかる', '',
     '## いまどうしているか', '複数の表を手で貼り合わせている', '',
     '## どうなればよいか', '10分で集計が終わり確認だけで済む', '',
@@ -47,4 +47,12 @@ test('記入済みの見本では段階0と1のファイルの条件を満たす
   const r = evaluate(dir, loadRules(), { git, gh: () => null, assumeInvited: true });
   assert.deepEqual(r.stages.map((s) => s.missing), [[], []]);
   assert.equal(r.currentStage, null);
+});
+
+test('CLAUDE.md は印を消しただけでは未完了', () => {
+  const dir = templateCopy();
+  const text = readFileSync(join(dir, 'CLAUDE.md'), 'utf8').replace('<!-- template -->\n', '');
+  writeFileSync(join(dir, 'CLAUDE.md'), text);
+  const r = evaluate(dir, loadRules(), { ...noRemote, assumeInvited: true });
+  assert.ok(r.stages[0].missing.some((m) => m.includes('CLAUDE.md')));
 });

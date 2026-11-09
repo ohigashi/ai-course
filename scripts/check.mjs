@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const TEMPLATE_MARK = '<!-- template -->';
 const COURSE_PATHS = ['course/', 'scripts/', '.claude/'];
+const TIME_PATTERN = /\d+\s*(分|時間|h\b|min)|半日|[一二三四五六七八九十]+\s*(分|時間)/i;
 
 // 他の人のリポジトリも読むので、シンボリックリンクでリポジトリの外を読まない。
 export function readRepoFile(repoDir, path) {
@@ -47,7 +48,7 @@ function checkHeadings(repoDir, check) {
   if (text === null) return [check.label];
   const found = sections(text);
   return check.headings
-    .filter((h) => countChars(found.get(h) ?? '') < check.minChars)
+    .filter((h) => countChars(found.get(h) ?? '') < (check.minCharsBy?.[h] ?? check.minChars))
     .map((h) => `${check.label}(「${h}」の内容)`);
 }
 
@@ -56,7 +57,7 @@ function checkTimedItems(repoDir, check) {
   if (text === null) return [check.label];
   const count = text
     .split('\n')
-    .filter((line) => /^\s*[-*]\s+/.test(line) && /\d+\s*(分|時間)/.test(toHalfWidthDigits(line))).length;
+    .filter((line) => !/^\s*(#|<!--)/.test(line) && TIME_PATTERN.test(toHalfWidthDigits(line))).length;
   return count >= check.min ? [] : [`${check.label}(いま ${count} 件)`];
 }
 

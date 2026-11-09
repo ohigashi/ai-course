@@ -1,6 +1,6 @@
 // 大東の手元で実行し、メンバーのリポジトリに同じ判定をかけてチームのページを作る。
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -21,6 +21,12 @@ export function problemOf(text) {
   const body = sections(text.replace(/\r\n?/g, '\n')).get('何が困っているか') ?? '';
   const cleaned = body.replace(/<!--[\s\S]*?-->/g, '').trim();
   return cleaned || null;
+}
+
+// メンバーの名前は公開のリポジトリに入れない。手元のファイルから読む。
+export function loadMembers(root) {
+  const path = join(root, 'members.local.json');
+  return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : [];
 }
 
 function currentLabel(member) {
@@ -96,7 +102,8 @@ function memberStatus(member, repos, rules, workDir) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const root = dirname(dirname(fileURLToPath(import.meta.url)));
-  const members = JSON.parse(readFileSync(join(root, 'course', 'members.json'), 'utf8'));
+  const members = loadMembers(root);
+  if (members.length === 0) console.log('members.local.json にメンバーがいません。');
   const workDir = mkdtempSync(join(tmpdir(), 'ai-course-status-'));
   try {
     acceptInvitations(members);

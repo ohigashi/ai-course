@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderPage, selectInvitations, quietMembers, problemOf } from '../scripts/status.mjs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { renderPage, selectInvitations, quietMembers, problemOf, loadMembers } from '../scripts/status.mjs';
 
 const result = (currentStage, lastCommitDate = '2026-11-09T10:00:00+09:00') => ({
   stages: [
@@ -65,4 +68,11 @@ test('「何が困っているか」の本文を取り出す。CRLF でも読め
 test('リポジトリがまだない人は開始前と表示する', () => {
   const html = renderPage([{ name: '鈴木', github: 's', repo: null, result: null, problem: null }]);
   assert.ok(html.includes('開始前'));
+});
+
+test('メンバーは手元のファイルから読み、無ければ空にする', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mem-'));
+  assert.deepEqual(loadMembers(dir), []);
+  writeFileSync(join(dir, 'members.local.json'), '[{"github":"a","name":"A"}]');
+  assert.deepEqual(loadMembers(dir), [{ github: 'a', name: 'A' }]);
 });

@@ -147,3 +147,17 @@ test('リポジトリの外を指すシンボリックリンクは読まない',
 test('リポジトリの中の通常のファイルは読める', () => {
   assert.equal(readRepoFile(repo({ 'docs/a.md': '本文' }), 'docs/a.md'), '本文');
 });
+
+test('timed_items: 箇条書きでない行、番号、2h、半日も数え、見出しは数えない', () => {
+  const rules = [stage(1, [{ type: 'timed_items', path: 't.md', min: 4, label: '業務' }])];
+  const ok = '# 業務 30分\n・売上の集計 30分\n1. 請求書 2h\n日報 半日\n議事録 三十分\n';
+  assert.equal(evaluate(repo({ 't.md': ok }), rules, noRemote).stages[0].done, true);
+  const short = '# 業務 30分\n・売上の集計 30分\n1. 請求書 2h\n日報\n';
+  assert.equal(evaluate(repo({ 't.md': short }), rules, noRemote).stages[0].done, false);
+});
+
+test('headings: 見出しごとに下限を変えられる', () => {
+  const check = { type: 'headings', path: 'p.md', headings: ['誰の', '何が困っているか'], minChars: 10, minCharsBy: { '誰の': 2 }, label: 'x' };
+  const ok = '## 誰の\n自分\n\n## 何が困っているか\n月末の集計に毎回2時間かかる\n';
+  assert.equal(evaluate(repo({ 'p.md': ok }), [stage(1, [check])], noRemote).stages[0].done, true);
+});
