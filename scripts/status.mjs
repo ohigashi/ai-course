@@ -1,6 +1,6 @@
 // 大東の手元で実行し、メンバーのリポジトリに同じ判定をかけてチームのページを作る。
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -99,6 +99,36 @@ export function renderTeamMd(members) {
   const tips = shared.flatMap((m) => (m.share.tips ?? []).map((tip) => `- ${tip}(${m.name})`));
   if (tips.length) lines.push('## 効いた使い方', '', ...tips, '');
   return `${lines.join('\n').trimEnd()}\n`;
+}
+
+export const dataFileName = (github) => `${github.toLowerCase()}.json`;
+
+// Web に見せてよい項目だけを書き出す。活用日数、.local の中身、月ごとの記録は含めない。
+export function renderMemberData(member, phases, updatedAt) {
+  const synced = Boolean(member.result) && !member.failed;
+  const o = member.outcome ?? {};
+  return {
+    version: 1,
+    name: member.name,
+    updatedAt,
+    works: synced ? (member.works ?? []).map((w) => ({ name: w.name, phase: w.phase, phaseTitle: phases.find((p) => p.id === w.phase)?.title ?? '', state: w.state, next: w.next ?? '', rounds: w.rounds ?? 0 })) : [],
+    currentPhaseTitle: currentLabel(member),
+    phasesDone: [...new Set((member.milestones ?? []).map((e) => /^phase-done:(\d{1,3})$/.exec(e.key)?.[1]).filter(Boolean).map(Number))].sort((a, b) => a - b),
+    made: (o.made ?? []).slice(0, 8),
+    monthlySavedHours: o.monthlySavedHours ?? 0,
+    url: o.url ?? null,
+    stepups: o.stepups ?? 0,
+    timeline: renderTimeline(member.milestones ?? [], loadRoadmap(), { phases, mechanisms: [] }).split('\n').filter(Boolean).map((line) => ({ date: line.slice(0, 10), text: line.slice(11) })),
+  };
+}
+
+// 取得できた人だけ書く。取得に失敗した人のファイルは前回のまま残し、名簿にいない人のファイルだけ消す。
+export function dataTargets(statuses, existingFiles) {
+  const names = new Set(statuses.map((m) => dataFileName(m.github)));
+  return {
+    write: statuses.filter((m) => !m.failed && m.result),
+    remove: existingFiles.filter((f) => f.endsWith('.json') && !names.has(f)),
+  };
 }
 
 function currentLabel(member) {
@@ -300,6 +330,22 @@ function syncTeam(statuses, teamRepo, operator, workDir) {
   }
 }
 
+// 表示用データのリポジトリへ、1人1ファイルで反映する。
+function syncData(statuses, dataRepo, workDir, updatedAt) {
+  const dir = join(workDir, '_data');
+  gh('repo', 'clone', dataRepo, dir, '--', '--quiet');
+  const phases = loadPhases();
+  const { write, remove } = dataTargets(statuses, readdirSync(dir));
+  for (const m of write) writeFileSync(join(dir, dataFileName(m.github)), `${JSON.stringify(renderMemberData(m, phases, updatedAt), null, 2)}\n`);
+  for (const f of remove) rmSync(join(dir, f));
+  if (git(dir, 'status', '--porcelain').trim()) {
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-q', '-m', '表示用データを更新する');
+    git(dir, 'push', '-q');
+    console.log('表示用データを更新しました。');
+  }
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const root = dirname(dirname(fileURLToPath(import.meta.url)));
   const members = loadMembers(root);
@@ -319,6 +365,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       const config = loadConfig();
       if (shouldSyncTeam(members, gh('api', 'user', '--jq', '.login').trim(), config.operatorGithub)) {
         syncTeam(statuses, config.teamRepo, config.operatorGithub, workDir);
+        if (config.dataRepo) {
+          try {
+            syncData(statuses, config.dataRepo, workDir, new Date().toISOString());
+          } catch {
+            console.log('表示用データを更新できませんでした。');
+          }
+        }
       }
     } catch {
       console.log('チームのリポジトリを更新できませんでした。');

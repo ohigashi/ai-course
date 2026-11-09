@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadPhases, phaseOfStage } from '../scripts/phases.mjs';
-import { recentMoves, renderPage, selectInvitations, quietMembers, problemOf, loadMembers, parseShare, renderTeamMd, teamInviteTargets, selectTeamInvitation, shouldSyncTeam, collectStatuses, teamRemoveTargets } from '../scripts/status.mjs';
+import { recentMoves, renderPage, selectInvitations, quietMembers, problemOf, loadMembers, parseShare, renderTeamMd, teamInviteTargets, selectTeamInvitation, shouldSyncTeam, collectStatuses, teamRemoveTargets, renderMemberData, dataFileName, dataTargets } from '../scripts/status.mjs';
 
 const result = (currentStage, lastCommitDate = '2026-11-09T10:00:00+09:00') => ({
   stages: [
@@ -289,4 +289,36 @@ test('TEAM.md: 取り組みの了承がなければ進めていることを載�
   assert.ok(!renderTeamMd([{ ...a, share: shareOf() }]).includes('進めていること'));
   assert.ok(!renderTeamMd([{ ...a, share: shareOf({ works: false }) }]).includes('進めていること'));
   assert.ok(renderTeamMd([{ ...a, share: shareOf({ works: true }) }]).includes('- 進めていること: 証憑消込'));
+});
+
+test('renderMemberData: 活用日数を含めず、見せてよい項目だけを出す', () => {
+  const m = { ...member('受講者A', 'Aa', 1), outcome: { made: ['a.txt'], monthlySavedHours: 3, url: 'https://x', stepups: 1 }, activity: { weekDays: 4, monthDays: 9 }, works: [{ name: '証憑', phase: 2, state: 'active', next: '書く', rounds: 1 }], milestones: [{ key: 'phase-done:1', date: '2026-11-03' }, { key: 'phase:慣れる', date: '2026-11-01' }], months: [{ month: '2026-11', days: 12 }] };
+  const d = renderMemberData(m, loadPhases(), '2026-11-10T01:00:00Z');
+  assert.deepEqual(Object.keys(d).sort(), ['currentPhaseTitle','made','monthlySavedHours','name','phasesDone','stepups','timeline','updatedAt','url','version','works']);
+  assert.equal(JSON.stringify(d).includes('monthDays'), false);
+  assert.equal(JSON.stringify(d).includes('2026-11","days'), false);
+  assert.deepEqual(d.phasesDone, [1]);
+  assert.deepEqual(d.timeline, [{ date: '2026-11-03', text: 'フェーズ1 作ってみる を終えた' }]);
+  assert.equal(d.works[0].phaseTitle, '課題からアプリを作る');
+  assert.equal(d.currentPhaseTitle, phaseOfStage(1, loadPhases()).title);
+});
+test('renderMemberData: 未同期や取得失敗の人は取り組みが空・成果は既定値', () => {
+  const d = renderMemberData({ name: '受講者A', github: 'a', result: null, works: [{ name: 'x', phase: 1, state: 'active', next: '', rounds: 0 }] }, loadPhases(), 't');
+  assert.deepEqual(d.works, []);
+  assert.deepEqual([d.made, d.monthlySavedHours, d.url, d.stepups, d.phasesDone, d.timeline], [[], 0, null, 0, [], []]);
+  const many = renderMemberData({ ...member('受講者A', 'a', 1), outcome: { made: Array.from({ length: 12 }, (_, i) => `f${i}`) } }, loadPhases(), 't');
+  assert.equal(many.made.length, 8);
+});
+test('dataFileName: 小文字にする', () => assert.equal(dataFileName('Ab-C'), 'ab-c.json'));
+test('dataTargets: 取得に失敗した人は書かず、消しもしない。名簿にいない人のファイルは消す', () => {
+  const { write, remove } = dataTargets([{ github: 'a', result: {} }, { github: 'b', failed: true }], ['a.json', 'b.json', 'gone.json']);
+  assert.deepEqual(write.map((m) => m.github), ['a']);
+  assert.deepEqual(remove, ['gone.json']);
+});
+test('dataTargets: 開始前(result なし)の人は書かないが、消しもしない', () => {
+  const { write, remove } = dataTargets([{ github: 'A', result: null }], ['a.json']);
+  assert.deepEqual([write.length, remove], [0, []]);
+});
+test('dataTargets: failed なら result があっても書かない', () => {
+  assert.deepEqual(dataTargets([{ github: 'a', failed: true, result: {} }], ['a.json']), { write: [], remove: [] });
 });
