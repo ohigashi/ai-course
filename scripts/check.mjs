@@ -3,8 +3,9 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, lstatSync, realpathSync, readdirSync } from 'node:fs';
 import { join, dirname, relative, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { loadRoadmap, renderRoadmap } from './roadmap.mjs';
-import { activitySummary, parseActivity, phaseOf } from './activity.mjs';
+import { renderRoadmap } from './roadmap.mjs';
+import { activitySummary, parseActivity } from './activity.mjs';
+import { loadPhases, phaseOfStage } from './phases.mjs';
 import { levelProgress, loadCatalog, parseCompleted } from './challenge.mjs';
 
 const TEMPLATE_MARK = '<!-- template -->';
@@ -212,7 +213,7 @@ export function evaluate(repoDir, rules, env) {
   const lastCommitDate = env.git(['log', '-1', '--format=%cI'])?.trim() || null;
   const currentStage = current ? current.id : null;
   const activity = activitySummary(parseActivity(readRepoFile(repoDir, 'activity.json')));
-  const phase = phaseOf({ currentStage }, activity, listFiles(repoDir, 'docs/stepups').length);
+  const phase = phaseOfStage(currentStage, loadPhases()).title;
   return { stages, currentStage, lastCommitDate, unsaved: hasUnsavedWork(env), claudeMd: claudeMdStatus(repoDir, env), activity, phase };
 }
 
@@ -251,5 +252,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const repoDir = dirname(dirname(fileURLToPath(import.meta.url)));
   const env = createCliEnv(repoDir, { assumeInvited: process.argv.includes('--assume-invited') });
   const result = evaluate(repoDir, loadRules(), env);
-  process.stdout.write(`${JSON.stringify({ ...result, roadmap: renderRoadmap(result, loadRoadmap()) }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ ...result, roadmap: renderRoadmap(result, loadPhases()) }, null, 2)}\n`);
 }

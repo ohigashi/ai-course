@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { evaluate, readRepoFile, claudeMdStatus, reminderText, parseSavings, updateReminderText } from '../scripts/check.mjs';
+import { loadRules, evaluate, readRepoFile, claudeMdStatus, reminderText, parseSavings, updateReminderText } from '../scripts/check.mjs';
 
 const noRemote = { git: () => null, gh: () => null };
 
@@ -305,4 +305,10 @@ test('challenge_levels: 課題解決のレベルをすべて終えたら完了',
 test('取り組み中の課題の作りかけは未保存に数えない', () => {
   const env = { git: (a) => (a[0] === 'status' ? '# branch.ab +0 -0\n? challenges/l1-message/a.md\n' : null), gh: () => null };
   assert.equal(evaluate(repo({}), [], env).unsaved, false);
+});
+
+test('段階0だけ済の人の次は段階2(小さな自動化が先)', () => {
+  const rules = loadRules().map((r) => (r.id === 0 ? { ...r, checks: [] } : r));
+  const dir = repo({});
+  assert.equal(evaluate(dir, rules, { ...noRemote, assumeInvited: true }).currentStage, 2);
 });

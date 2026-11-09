@@ -24,6 +24,32 @@
     ]
   },
   {
+    "id": 2,
+    "title": "小さな自動化",
+    "checks": [
+      {
+        "type": "any_file",
+        "dir": "work",
+        "label": "work/ に作ったものを保存する"
+      },
+      {
+        "type": "savings",
+        "path": "docs/02-log.md",
+        "label": "docs/02-log.md に、かかった時間の前後と月の回数を書く"
+      },
+      {
+        "type": "headings",
+        "path": "docs/02-log.md",
+        "headings": [
+          "やったこと",
+          "結果"
+        ],
+        "minChars": 10,
+        "label": "docs/02-log.md に、やったことと結果を書く"
+      }
+    ]
+  },
+  {
     "id": 1,
     "title": "課題の洗い出し",
     "checks": [
@@ -47,32 +73,6 @@
         "minCharsBy": {
           "誰の": 2
         }
-      }
-    ]
-  },
-  {
-    "id": 2,
-    "title": "小さな自動化",
-    "checks": [
-      {
-        "type": "any_file",
-        "dir": "work",
-        "label": "work/ に作ったものを保存する"
-      },
-      {
-        "type": "savings",
-        "path": "docs/02-log.md",
-        "label": "docs/02-log.md に、かかった時間の前後と月の回数を書く"
-      },
-      {
-        "type": "headings",
-        "path": "docs/02-log.md",
-        "headings": [
-          "やったこと",
-          "結果"
-        ],
-        "minChars": 10,
-        "label": "docs/02-log.md に、やったことと結果を書く"
       }
     ]
   },

@@ -25,8 +25,8 @@ test('rules.json の全パスがひな形に存在する', () => {
   for (const c of fileChecks(loadRules())) assert.ok(existsSync(sourceOf(c.path)), c.path);
 });
 
-test('段階は0から5まで順に並ぶ', () => {
-  assert.deepEqual(loadRules().map((r) => r.id), [0, 1, 2, 3, 4, 5, 6, 7]);
+test('段階の判定は 0, 2, 1, 3... の順(小さな自動化を先に)', () => {
+  assert.deepEqual(loadRules().map((r) => r.id), [0, 2, 1, 3, 4, 5, 6, 7]);
   assert.equal(loadRules().find((r) => r.id === 6).optional, true);
 });
 
@@ -48,7 +48,7 @@ test('記入済みの見本では段階0と1のファイルの条件を満たす
   ].join('\n'));
   const git = (args) => (args[0] === 'rev-parse' ? 'a' : args[0] === 'status' ? '# branch.ab +0 -0' : null);
   const r = evaluate(dir, loadRules(), { git, gh: () => null, assumeInvited: true });
-  assert.deepEqual(r.stages.slice(0, 2).map((s) => s.missing), [[], []]);
+  assert.deepEqual([0, 1].map((id) => r.stages.find((s) => s.id === id).missing), [[], []]);
   assert.equal(r.currentStage, 2);
 });
 

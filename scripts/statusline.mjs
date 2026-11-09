@@ -2,11 +2,12 @@
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { evaluate, createEnv, loadRules } from './check.mjs';
-import { loadRoadmap, statusLine } from './roadmap.mjs';
+import { statusLine } from './roadmap.mjs';
+import { loadPhases } from './phases.mjs';
 
 try {
   const repoDir = dirname(dirname(fileURLToPath(import.meta.url)));
-  console.log(statusLine(evaluate(repoDir, loadRules(), createEnv(repoDir, { assumeInvited: true })), loadRoadmap()));
+  console.log(statusLine(evaluate(repoDir, loadRules(), createEnv(repoDir, { assumeInvited: true })), loadPhases()));
 } catch {
   console.log('コース');
 }
