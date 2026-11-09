@@ -278,3 +278,8 @@ test('.local の中身は未保存の作業に数えない', () => {
   const env = { git: (a) => (a[0] === 'status' ? '# branch.ab +0 -0\n? .local/log.md\n' : null), gh: () => null };
   assert.equal(evaluate(repo({}), [], env).unsaved, false);
 });
+
+test('challenge_levels: 課題解決のレベルをすべて終えたら完了', () => {
+  const rules = [stage(7, [{ type: 'challenge_levels', label: 'レベルを終える' }])];
+  assert.equal(evaluate(repo({}), rules, noRemote).stages[0].done, false);
+});

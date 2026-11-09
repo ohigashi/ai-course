@@ -42,7 +42,7 @@ test('画面下の表示: 準備中の段階では次の案内を出さない', 
 });
 
 test('コースの全体は基本の6段階と並行のチームで作る', () => {
-  assert.deepEqual(loadRoadmap().map((s) => s.title), ['環境づくり', '課題の洗い出し', '小さな自動化', 'プロダクト化', 'アプリ開発', '公開と運用', 'チームで作る']);
+  assert.deepEqual(loadRoadmap().map((s) => s.title), ['環境づくり', '課題の洗い出し', '小さな自動化', 'プロダクト化', 'アプリ開発', '公開と運用', 'チームで作る', '課題解決とプロダクト']);
 });
 
 const withTeam = [...roadmap, { id: 6, title: 'チームで作る', goal: '共同で作る', optional: true, availableAfter: 1 }];

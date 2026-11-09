@@ -11,7 +11,8 @@ description: コースのいまの段階と、次にやることを受講者に�
 
 1. `node scripts/update-course.mjs` を実行する。「更新があります」と表示されたら、変更されるファイルを受講者に伝え、`git show <版>:course/changelog.md` を読んで手元の `course/changelog.md` に無い項目を受講者に伝え、受講者の `CLAUDE.md` や `docs/` に照らして、その人の仕事で使える場面を1文で添える。了承を得てから表示された版で `node scripts/update-course.mjs --apply=<版>` を実行する。適用のあとにもう一度確認し、更新が残っていれば同じ手順で適用する。了承がなければ手元の版で続ける
 2. `node scripts/check.mjs` を実行し、JSON の結果を読む。段階の完了と未完了は、この結果だけで決める。自分の判断で完了にしない
-3. `currentStage` の教材 `course/stage-<番号>.md`、`CLAUDE.md`、`docs/` の作成中のファイルを読む
+3. `node scripts/history.mjs` を実行して、これまでの歩みを更新する。`milestones.json` が変わったら、`git add milestones.json` のあと `git commit -m "歩みの更新" -- milestones.json` を実行して push する。受講者が歩みを見たいときは出力を見せる
+   続けて `currentStage` の教材 `course/stage-<番号>.md`、`CLAUDE.md`、`docs/` の作成中のファイルを読む
 4. 次の順で、短く返す
    - 5段階のいまの位置(結果の `phase`。学ぶ、試す、慣れる、仕組みとして実装する、継続される)と、今月と先月の活用日数(`activity`)。比べる相手は先月の自分だけにする
    - コースの全体像(結果の `roadmap` をそのまま表示する。「済」は終えた段階、「今」はいまの段階)
@@ -45,6 +46,10 @@ description: コースのいまの段階と、次にやることを受講者に�
 - 本人の答えのとおりに `share` と `project` を true か false にして、`problem` と `made` と一緒に `team-share.json` を作り、commit と push をする。片方だけの了承なら片方だけ true にする。どちらも断られたときも、両方 false のファイルを作り、次から聞かない。一覧には表示名も載ることを伝える
 - `team-share.json` の文と実際の状況が大きく変わったら、新しい案を見せて更新を提案する。本人の了承なしに書き換えない
 - 段階2を終えたら「チームで作る」に参加できることを案内する。`course/stage-6.md` を読み、`/team` を案内する。組む相手がいない人には必須でないと伝える
+
+## 課題解決とプロダクトコース
+
+段階2を終えたら、基本コースと並行して `/challenge` で進められることを案内する。
 
 ## CLAUDE.md の見直し
 

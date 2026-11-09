@@ -5,6 +5,7 @@ import { join, dirname, relative, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadRoadmap, renderRoadmap } from './roadmap.mjs';
 import { activitySummary, parseActivity, phaseOf } from './activity.mjs';
+import { levelProgress, loadCatalog, parseCompleted } from './challenge.mjs';
 
 const TEMPLATE_MARK = '<!-- template -->';
 const COURSE_PATHS = ['course/', 'scripts/', '.claude/', '.local/'];
@@ -161,6 +162,8 @@ function runCheck(repoDir, check, env) {
     }
     case 'url':
       return checkUrl(repoDir, check, env);
+    case 'challenge_levels':
+      return levelProgress(parseCompleted(readRepoFile(repoDir, 'challenges.json')), loadCatalog()).current === null ? [] : [check.label];
     case 'team_pr': {
       const text = readDoc(repoDir, check.path);
       return text?.includes(`github.com/${check.repo}/pull/`) && new RegExp(`github\\.com/${check.repo}/pull/\\d+`).test(text) ? [] : [check.label];

@@ -1,0 +1,92 @@
+[
+  {
+    "id": "l1-meeting-time",
+    "level": 1,
+    "title": "会議の日程調整を楽にする",
+    "file": "items/l1-meeting-time.md"
+  },
+  {
+    "id": "l1-message",
+    "level": 1,
+    "title": "長い連絡文を読みやすくする",
+    "file": "items/l1-message.md"
+  },
+  {
+    "id": "l1-shopping",
+    "level": 1,
+    "title": "週の買い物の準備を楽にする",
+    "file": "items/l1-shopping.md"
+  },
+  {
+    "id": "l2-trip",
+    "level": 2,
+    "title": "旅行の持ち物と予算を整理する",
+    "file": "items/l2-trip.md"
+  },
+  {
+    "id": "l2-fixed-costs",
+    "level": 2,
+    "title": "毎月の固定費を見直す",
+    "file": "items/l2-fixed-costs.md"
+  },
+  {
+    "id": "l2-minutes",
+    "level": 2,
+    "title": "会議メモから次の行動を取り出す",
+    "file": "items/l2-minutes.md"
+  },
+  {
+    "id": "l3-neighborhood",
+    "level": 3,
+    "title": "町内会の連絡を楽にする",
+    "file": "items/l3-neighborhood.md"
+  },
+  {
+    "id": "l3-clinic",
+    "level": 3,
+    "title": "小さな診療所の待ち時間の不安を減らす",
+    "file": "items/l3-clinic.md"
+  },
+  {
+    "id": "l3-club",
+    "level": 3,
+    "title": "部活の連絡と出欠を楽にする",
+    "file": "items/l3-club.md"
+  },
+  {
+    "id": "l4-chores",
+    "level": 4,
+    "title": "共働き家庭の家事の偏りを解く",
+    "file": "items/l4-chores.md"
+  },
+  {
+    "id": "l4-event",
+    "level": 4,
+    "title": "地域のイベントの当日運営を支える",
+    "file": "items/l4-event.md"
+  },
+  {
+    "id": "l4-study",
+    "level": 4,
+    "title": "受験生の学習計画を続けられるようにする",
+    "file": "items/l4-study.md"
+  },
+  {
+    "id": "l5-giveaway",
+    "level": 5,
+    "title": "不要品を地域で譲り合う",
+    "file": "items/l5-giveaway.md"
+  },
+  {
+    "id": "l5-volunteer",
+    "level": 5,
+    "title": "ボランティアのシフトを回す",
+    "file": "items/l5-volunteer.md"
+  },
+  {
+    "id": "l5-carpool",
+    "level": 5,
+    "title": "地域の移動の助け合いを作る",
+    "file": "items/l5-carpool.md"
+  }
+]

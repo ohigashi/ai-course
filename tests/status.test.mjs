@@ -218,3 +218,18 @@ test('TEAM.md: 「継続される」は活用量が分かるので、チーム�
   assert.ok(!md.includes('継続される'));
   assert.ok(md.includes('いまの位置: 仕組みとして実装する'));
 });
+
+test('TEAM.md: 了承者の節目の日付を載せ、活用の推移は載せない', () => {
+  const a = { ...member('中村', 'n', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, milestones: [{ key: 'level:1', date: '2026-11-10' }, { key: 'phase:継続される', date: '2026-11-11' }], months: [{ month: '2026-11', days: 12 }] };
+  const md = renderTeamMd([a]);
+  assert.ok(md.includes('2026-11-10') && md.includes('課題解決 レベル1'));
+  assert.ok(!md.includes('継続される') && !md.includes('2026-11-11'));
+  assert.ok(!md.includes('12日'));
+});
+
+test('運営のページ: 節目と月ごとの活用の推移を示す', () => {
+  const a = { ...member('中村', 'n', 1), outcome: { made: [], monthlySavedHours: 0 }, milestones: [{ key: 'stage:0', date: '2026-11-09' }], months: [{ month: '2026-11', days: 12 }] };
+  const html = renderPage([a]);
+  assert.ok(html.includes('2026-11-09'));
+  assert.ok(html.includes('2026-11: 12日'));
+});

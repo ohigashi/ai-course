@@ -162,5 +162,17 @@
         "label": "docs/06-team.md に反映した変更の URL を書く"
       }
     ]
+  },
+  {
+    "id": 7,
+    "title": "課題解決とプロダクト",
+    "optional": true,
+    "availableAfter": 2,
+    "checks": [
+      {
+        "type": "challenge_levels",
+        "label": "課題解決のレベルをすべて終える"
+      }
+    ]
   }
 ]

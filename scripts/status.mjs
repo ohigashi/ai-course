@@ -4,6 +4,9 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseMilestones, monthlyActivity, renderTimeline, teamMilestones } from './history.mjs';
+import { loadRoadmap } from './roadmap.mjs';
+import { parseActivity } from './activity.mjs';
 import { evaluate, createEnv, loadRules, loadConfig, sections, readRepoFile, listFiles, parseSavings, urlOf } from './check.mjs';
 
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
@@ -87,6 +90,8 @@ export function renderTeamMd(members) {
     if (m.share.problem) lines.push(`- 取り組んでいる課題: ${m.share.problem}`);
     if (count || m.share.made) lines.push(`- 作ったもの: ${count}件${m.share.made ? `。${m.share.made}` : ''}`);
     if (m.outcome?.monthlySavedHours) lines.push(`- 減らした時間: 月 ${m.outcome.monthlySavedHours}時間`);
+    const steps = teamMilestones(m.milestones ?? []);
+    if (steps.length) lines.push('- これまでの歩み:', ...renderTimeline(steps, loadRoadmap()).split('\n').map((l) => `  - ${l}`));
     lines.push('');
   }
   const tips = shared.flatMap((m) => (m.share.tips ?? []).map((tip) => `- ${tip}(${m.name})`));
@@ -118,6 +123,12 @@ function outcomeCell(member) {
   return parts.join('<br>') || '-';
 }
 
+function journeyCell(member) {
+  const steps = member.milestones?.length ? renderTimeline(member.milestones, loadRoadmap()).split('\n').map(escapeHtml) : [];
+  const months = (member.months ?? []).map((m) => `${escapeHtml(m.month)}: ${m.days}日`);
+  return [...steps, ...months].join('<br>') || '-';
+}
+
 export function renderPage(members) {
   const sorted = [...members].sort(byName);
   const totalHours = Math.round(sorted.reduce((sum, m) => sum + (m.outcome?.monthlySavedHours ?? 0), 0) * 10) / 10;
@@ -130,6 +141,7 @@ export function renderPage(members) {
 <td>${remaining(m).map(escapeHtml).join('<br>') || '-'}</td>
 <td>${m.problem ? escapeHtml(m.problem) : '-'}</td>
 <td>${outcomeCell(m)}</td>
+<td>${journeyCell(m)}</td>
 <td class="d">${m.result?.lastCommitDate ? escapeHtml(m.result.lastCommitDate.slice(0, 10)) : '-'}</td>
 </tr>`).join('\n');
   return `<!doctype html>
@@ -147,7 +159,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:8px 12px 8px 0;border-bo
 <h2>減らした時間の月合計</h2>
 <p>${totalHours}時間(本人の記録による)</p>
 <h2>メンバー</h2>
-<table><thead><tr><th>名前</th><th>いまの段階</th><th>残っていること</th><th>選んだ課題</th><th>成果</th><th>最終更新</th></tr></thead>
+<table><thead><tr><th>名前</th><th>いまの段階</th><th>残っていること</th><th>選んだ課題</th><th>成果</th><th>これまでの歩み</th><th>最終更新</th></tr></thead>
 <tbody>
 ${rows}
 </tbody></table>
@@ -186,7 +198,7 @@ function memberStatus(member, repos, rules, workDir) {
     url: launch === null ? null : urlOf(launch),
     stepups: listFiles(dir, 'docs/stepups').length,
   };
-  return { ...member, repo: repo.full_name, result, problem, outcome, share: parseShare(readRepoFile(dir, 'team-share.json')), activity: result.activity, phase: result.phase };
+  return { ...member, repo: repo.full_name, result, problem, outcome, share: parseShare(readRepoFile(dir, 'team-share.json')), activity: result.activity, phase: result.phase, milestones: parseMilestones(readRepoFile(dir, 'milestones.json')), months: monthlyActivity(parseActivity(readRepoFile(dir, 'activity.json'))) };
 }
 
 export function shouldSyncTeam(members, login, operator) {
