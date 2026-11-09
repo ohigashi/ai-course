@@ -57,7 +57,7 @@ export function closeRound(works, slug, today) {
   if (work.phase <= 2 && !work.redo) {
     throw new Error(`フェーズ${work.phase}の一区切りは、やり直しのときだけ付けられます。最初の1回は判定が通ると自動で記録されます。もう1回やるときは、先に /work で move <slug> ${work.phase} を実行して戻ってください。`);
   }
-  return update(works, slug, today, (w) => ({ rounds: [...w.rounds, { phase: w.phase, date: today }], redo: false }));
+  return update(works, slug, today, (w) => ({ rounds: [...w.rounds, { phase: w.phase, date: today }], redo: false, ...(w.phase <= 2 ? { next: '' } : {}) }));
 }
 
 // ---- CLI ----

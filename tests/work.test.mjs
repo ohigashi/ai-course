@@ -245,3 +245,11 @@ test('CLI: works.json が無い人の next でも、既定の取り組みに届�
   assert.deepEqual(rounds.map((x) => x.phase), [1]);
   assert.equal(readWorks(dir)[0].phase, 2);
 });
+
+test('closeRound: フェーズ1と2は next を空に戻し、フェーズ3と4は残す', () => {
+  const base = addWork([], 'A', 1, 'd')[0];
+  const p1 = closeRound([{ ...base, redo: true, next: 'x', rounds: [{ phase: 1, date: 'd' }] }], 'w1', 'e')[0];
+  assert.equal(p1.next, '');
+  assert.equal(p1.redo, false);
+  assert.equal(closeRound([{ ...base, phase: 3, next: 'x' }], 'w1', 'e')[0].next, 'x');
+});
