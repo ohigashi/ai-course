@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ensureLocalExcluded } from './local-dir.mjs';
 
 function configuredRemote() {
   try {
@@ -76,6 +77,7 @@ try {
   } else if (/^[0-9a-f]{40}$/.test(applyArg)) {
     git('checkout', applyArg, '--', ...COURSE_PATHS);
     addCourseSettings();
+    ensureLocalExcluded();
     console.log('コースを更新しました。');
   } else {
     console.log('版の指定が正しくないので、手元の版で続けます。');

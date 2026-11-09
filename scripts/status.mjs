@@ -29,6 +29,8 @@ export function loadMembers(root) {
   return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : [];
 }
 
+// 2人以下だと合計から個人の日数が分かるので、合計も出さない。
+const TEAM_TOTAL_MIN_MEMBERS = 3;
 const SHARE_TEXT_LIMIT = 120;
 const shareText = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, SHARE_TEXT_LIMIT) : '');
 
@@ -43,7 +45,7 @@ export function parseShare(text) {
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
   const tips = Array.isArray(data.tips) ? data.tips.filter((t) => typeof t === 'string').map(shareText).filter(Boolean).slice(0, 5) : [];
-  return { share: data.share === true, project: data.project === true, problem: shareText(data.problem), made: shareText(data.made), tips };
+  return { share: data.share === true, project: data.project === true, problem: shareText(data.problem), made: shareText(data.made), tips, declined: data.share === false && data.project === false };
 }
 
 export function teamInviteTargets(members, collaborators) {
@@ -54,7 +56,7 @@ export function teamInviteTargets(members, collaborators) {
 // 共有も参加もやめたと本人が記録した人だけを外す。未回答や取得の失敗では外さない。
 export function teamRemoveTargets(members, collaborators, operator) {
   const joined = new Set(collaborators.map((c) => c.toLowerCase()));
-  return members.filter((m) => m.share && !m.share.share && !m.share.project
+  return members.filter((m) => m.share?.declined
     && joined.has(m.github.toLowerCase()) && m.github.toLowerCase() !== operator.toLowerCase());
 }
 
@@ -73,13 +75,14 @@ export function renderTeamMd(members) {
     '## 全体', '',
     ...[...counts].map(([label, n]) => `- ${label}: ${n}人`),
     `- 減らした時間の月合計: ${total}時間(本人の記録による)`,
-    `- 今週の活用: チーム合計 ${weekTotal}日`, '',
+    ...(shared.length >= TEAM_TOTAL_MIN_MEMBERS ? [`- 今週の活用: チーム合計 ${weekTotal}日`] : []), '',
     '## メンバー', '',
   ];
   for (const m of shared) {
     const count = m.outcome?.made?.length ?? 0;
     lines.push(`### ${m.name}`, '');
-    if (m.phase) lines.push(`- いまの位置: ${m.phase}`);
+    // 「継続される」は活用の量で決まるので、チームには出さない。
+    if (m.phase) lines.push(`- いまの位置: ${m.phase === '継続される' ? '仕組みとして実装する' : m.phase}`);
     lines.push(`- いまの段階: ${currentLabel(m)}`);
     if (m.share.problem) lines.push(`- 取り組んでいる課題: ${m.share.problem}`);
     if (count || m.share.made) lines.push(`- 作ったもの: ${count}件${m.share.made ? `。${m.share.made}` : ''}`);

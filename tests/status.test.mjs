@@ -165,9 +165,11 @@ test('TEAM.md: 活用日数はチームの合計だけで、個人別には出�
   const a = { ...member('中村', 'n', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 4 } };
   const b = { ...member('鈴木', 's', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 3 } };
   const c = { ...member('非共有', 'x', 1), share: shareOf({ share: false }), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 5 } };
-  const md = renderTeamMd([a, b, c]);
-  assert.ok(md.includes('今週の活用: チーム合計 7日'));
+  const d = { ...member('大東', 'o', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 1 } };
+  const md = renderTeamMd([a, b, c, d]);
+  assert.ok(md.includes('今週の活用: チーム合計 8日'));
   assert.ok(!md.includes('4日') && !md.includes('3日'));
+  assert.ok(!renderTeamMd([a, b]).includes('チーム合計 7日'));
 });
 
 test('TEAM.md: 本人が選んだ効いた使い方と、5段階の位置を載せる', () => {
@@ -185,12 +187,12 @@ test('parseShare: tips は文字列だけを5件まで', () => {
 
 test('チームから外す対象: どちらもやめた人だけで、未回答や失敗や運営者は外さない', () => {
   const list = [
-    { github: 'quit', share: shareOf({ share: false, project: false }) },
+    { github: 'quit', share: shareOf({ share: false, project: false , declined: true }) },
     { github: 'keep', share: shareOf({ share: false, project: true }) },
     { github: 'none', share: null },
     { github: 'fail', share: null, failed: true },
-    { github: 'owner', share: shareOf({ share: false, project: false }) },
-    { github: 'gone', share: shareOf({ share: false, project: false }) },
+    { github: 'owner', share: shareOf({ share: false, project: false , declined: true }) },
+    { github: 'gone', share: shareOf({ share: false, project: false , declined: true }) },
   ];
   assert.deepEqual(teamRemoveTargets(list, ['QUIT', 'keep', 'none', 'fail', 'owner'], 'owner').map((m) => m.github), ['quit']);
 });
@@ -200,4 +202,19 @@ test('運営のページには活用日数を示す', () => {
   const html = renderPage([a]);
   assert.ok(html.includes('週 4日'));
   assert.ok(html.includes('試す'));
+});
+
+test('チームから外すのは、両方を false と明示した人だけ', () => {
+  assert.equal(parseShare('{"share":false,"project":false}').declined, true);
+  for (const text of ['{}', '{"share":"true","project":"true"}', '{"tips":["a"]}', '{"share":false}']) {
+    const m = { github: 'a', share: parseShare(text) };
+    assert.deepEqual(teamRemoveTargets([m], ['a'], 'owner'), [], text);
+  }
+});
+
+test('TEAM.md: 「継続される」は活用量が分かるので、チームには出さない', () => {
+  const a = { ...member('中村', 'n', 1), share: shareOf(), phase: '継続される', outcome: { made: [], monthlySavedHours: 0 } };
+  const md = renderTeamMd([a]);
+  assert.ok(!md.includes('継続される'));
+  assert.ok(md.includes('いまの位置: 仕組みとして実装する'));
 });

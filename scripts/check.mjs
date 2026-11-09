@@ -7,7 +7,7 @@ import { loadRoadmap, renderRoadmap } from './roadmap.mjs';
 import { activitySummary, parseActivity, phaseOf } from './activity.mjs';
 
 const TEMPLATE_MARK = '<!-- template -->';
-const COURSE_PATHS = ['course/', 'scripts/', '.claude/'];
+const COURSE_PATHS = ['course/', 'scripts/', '.claude/', '.local/'];
 const TIME_PATTERN = /\d+\s*(分|時間|h\b|min)|半日|[一二三四五六七八九十]+\s*(分|時間)/i;
 
 // 他の人のリポジトリも読むので、シンボリックリンクでリポジトリの外を読まない。

@@ -17,8 +17,8 @@ test('parseActivity: 日付の形のものだけを読み、壊れていれば�
 
 test('activitySummary: 週、4週の活動、今月と先月を返す', () => {
   const days = ['2026-10-05', '2026-10-20', '2026-11-05', '2026-11-12', '2026-11-20', '2026-11-29', '2026-11-30'];
-  assert.deepEqual(activitySummary(days, now), { weekDays: 2, weeksActive: 4, monthDays: 5, prevMonthDays: 2 });
-  assert.deepEqual(activitySummary([], now), { weekDays: 0, weeksActive: 0, monthDays: 0, prevMonthDays: 0 });
+  assert.deepEqual(activitySummary(days, now), { weekDays: 2, weeksActive: 4, monthDays: 5, prevMonthDays: 2, everContinued: true });
+  assert.deepEqual(activitySummary([], now), { weekDays: 0, weeksActive: 0, monthDays: 0, prevMonthDays: 0, everContinued: false });
 });
 
 const r = (currentStage) => ({ currentStage });
@@ -35,4 +35,12 @@ test('phaseOf: 段階と活用の状況から5段階を返す', () => {
   assert.equal(phaseOf(r(4), quiet, 0), '仕組みとして実装する');
   assert.equal(phaseOf(r(null), quiet, 0), '仕組みとして実装する');
   assert.equal(phaseOf(r(4), active, 0), '継続される');
+});
+
+test('一度「継続される」に達したら、活用が減っても位置は戻らない', () => {
+  const past = activitySummary(['2026-08-03', '2026-08-10', '2026-08-17'], now);
+  assert.equal(past.weeksActive, 0);
+  assert.equal(past.everContinued, true);
+  assert.equal(phaseOf(r(4), past, 0), '継続される');
+  assert.equal(activitySummary(['2026-08-03', '2026-10-10'], now).everContinued, false);
 });

@@ -76,3 +76,7 @@ test('全段階の教材と、発展コースの一覧の全ファイルがあ�
 test('進み具合の条件に push を入れない', () => {
   assert.ok(!loadRules().flatMap((r) => r.checks).some((c) => c.type === 'pushed'));
 });
+
+test('.gitignore で .local を除外している', () => {
+  assert.ok(readFileSync(join(root, '.gitignore'), 'utf8').split('\n').includes('.local/'));
+});

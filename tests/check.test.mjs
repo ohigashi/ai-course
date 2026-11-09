@@ -273,3 +273,8 @@ test('team_pr: チームのリポジトリの変更の URL の形だけを確か
   assert.equal(evaluate(repo({ 'u.md': 'https://github.com/x/other/pull/1' }), rules, env).stages[0].done, false);
   assert.equal(evaluate(repo({ 'u.md': 'https://github.com/o/team/issues/3' }), rules, env).stages[0].done, false);
 });
+
+test('.local の中身は未保存の作業に数えない', () => {
+  const env = { git: (a) => (a[0] === 'status' ? '# branch.ab +0 -0\n? .local/log.md\n' : null), gh: () => null };
+  assert.equal(evaluate(repo({}), [], env).unsaved, false);
+});

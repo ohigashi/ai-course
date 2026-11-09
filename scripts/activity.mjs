@@ -28,7 +28,10 @@ export function activitySummary(days, now = new Date()) {
   const weeks = new Set(recent.filter((n) => n < 28).map((n) => Math.floor(n / 7)));
   const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const inMonth = (key) => days.filter((d) => d.startsWith(key)).length;
+  const continuedAt = (end) => new Set(days.map((d) => (Date.parse(`${end}T00:00:00`) - Date.parse(`${d}T00:00:00`)) / DAY_MS)
+    .filter((n) => n >= 0 && n < 28).map((n) => Math.floor(n / 7))).size >= WEEKS_FOR_CONTINUING;
   return {
+    everContinued: days.some(continuedAt),
     weekDays: recent.filter((n) => n < 7).length,
     weeksActive: weeks.size,
     monthDays: inMonth(monthKey(now.getFullYear(), now.getMonth())),
@@ -41,7 +44,7 @@ export function phaseOf(result, activity, stepups) {
   if (stage !== null && stage < 2) return '学ぶ';
   if (stage === 2) return '試す';
   if (stage === null || stage >= 4 || stepups >= 1) {
-    return activity.weeksActive >= WEEKS_FOR_CONTINUING ? '継続される' : '仕組みとして実装する';
+    return activity.everContinued || activity.weeksActive >= WEEKS_FOR_CONTINUING ? '継続される' : '仕組みとして実装する';
   }
   return '慣れる';
 }

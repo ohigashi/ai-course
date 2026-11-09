@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -147,4 +147,24 @@ test('log.mjs: 日付だけを activity.json に残し、.local は GitHub に�
   assert.ok(status.includes('activity.json'));
   assert.ok(!status.includes('.local'));
   assert.equal(readFileSync(join(learner, '.git/info/exclude'), 'utf8').split('\n').filter((l) => l === '.local/').length, 1);
+});
+
+test('log.mjs: info フォルダが無くても除外でき、.local が既に commit されていたら止める', () => {
+  const { learner } = setup();
+  rmSync(join(learner, '.git/info'), { recursive: true, force: true });
+  const log = join(root, 'scripts', 'log.mjs');
+  assert.equal(spawnSync(process.execPath, [log], { cwd: learner, encoding: 'utf8' }).status, 0);
+  assert.ok(readFileSync(join(learner, '.git/info/exclude'), 'utf8').includes('.local/'));
+  write(learner, '.local/log.md', 'x');
+  git(learner, 'add', '-f', '.local/log.md');
+  git(learner, 'commit', '-q', '-m', 'oops');
+  const r = spawnSync(process.execPath, [log], { cwd: learner, encoding: 'utf8' });
+  assert.equal(r.status, 1);
+  assert.ok(r.stdout.includes('大東に相談'));
+});
+
+test('--apply でも .local を除外する', () => {
+  const { upstream, learner } = setup();
+  run(learner, upstream, `--apply=${shaOf(run(learner, upstream).stdout)}`);
+  assert.ok(readFileSync(join(learner, '.git/info/exclude'), 'utf8').includes('.local/'));
 });
