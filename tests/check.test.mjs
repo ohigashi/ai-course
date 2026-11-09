@@ -252,3 +252,24 @@ test('optional の段階は currentStage に数えない', () => {
   assert.equal(r.stages[1].done, false);
   assert.equal(r.stages[1].optional, true);
 });
+
+test('unsaved: 未保存があっても段階は戻らず、別の項目で示す', () => {
+  const rules = [stage(0, [{ type: 'file', path: 'a.md', minChars: 5, label: 'a' }]), stage(1, [{ type: 'file', path: 'b.md', minChars: 5, label: 'b' }])];
+  const dirty = { git: (a) => (a[0] === 'status' ? '# branch.ab +0 -0\n1 .M N... 1 1 1 a b docs/a.md\n' : null), gh: () => null };
+  const r = evaluate(repo({ 'a.md': longText }), rules, dirty);
+  assert.equal(r.currentStage, 1);
+  assert.equal(r.unsaved, true);
+  const clean = { git: (a) => (a[0] === 'status' ? '# branch.ab +0 -0\n' : null), gh: () => null };
+  assert.equal(evaluate(repo({}), rules, clean).unsaved, false);
+  assert.equal(evaluate(repo({}), rules, noRemote).unsaved, false);
+});
+
+test('team_pr: チームのリポジトリの変更の URL の形だけを確かめ、通信しない', () => {
+  const rules = [stage(6, [{ type: 'team_pr', path: 'u.md', repo: 'o/team', label: 'URL を書く' }])];
+  let called = false;
+  const env = { ...noRemote, http: () => { called = true; return null; } };
+  assert.equal(evaluate(repo({ 'u.md': 'https://github.com/o/team/pull/12 です' }), rules, env).stages[0].done, true);
+  assert.equal(called, false);
+  assert.equal(evaluate(repo({ 'u.md': 'https://github.com/x/other/pull/1' }), rules, env).stages[0].done, false);
+  assert.equal(evaluate(repo({ 'u.md': 'https://github.com/o/team/issues/3' }), rules, env).stages[0].done, false);
+});

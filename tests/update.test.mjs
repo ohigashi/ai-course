@@ -122,3 +122,14 @@ test('壊れた設定ファイルは書き換えない', () => {
   run(learner, upstream, `--apply=${shaOf(run(learner, upstream).stdout)}`);
   assert.equal(readFileSync(join(learner, '.claude/settings.json'), 'utf8'), '{ broken');
 });
+
+test('受講者が自分で作ったスキルがあっても、更新の案内を繰り返さない', () => {
+  const { upstream, learner } = setup();
+  run(learner, upstream, `--apply=${shaOf(run(learner, upstream).stdout)}`);
+  write(learner, '.claude/skills/my-skill/SKILL.md', '自分のスキル');
+  git(learner, 'add', '-A');
+  git(learner, 'commit', '-q', '-m', 'my skill');
+  const r = run(learner, upstream);
+  assert.ok(r.stdout.includes('最新です'));
+  assert.ok(!r.stdout.includes('my-skill'));
+});

@@ -78,6 +78,7 @@ export function renderTeamMd(members) {
 }
 
 function currentLabel(member) {
+  if (member.failed) return '取得できませんでした';
   if (!member.result) return '開始前';
   const { currentStage, stages } = member.result;
   if (currentStage === null) return '用意した段階をすべて完了';
@@ -171,14 +172,34 @@ function memberStatus(member, repos, rules, workDir) {
   return { ...member, repo: repo.full_name, result, problem, outcome, share: parseShare(readRepoFile(dir, 'team-share.json')) };
 }
 
+export function shouldSyncTeam(members, login, operator) {
+  return members.length > 0 && login.toLowerCase() === operator.toLowerCase();
+}
+
+// 1人の失敗で全体を止めない。失敗した人はチームに載せない。
+export function collectStatuses(members, read) {
+  return members.map((member) => {
+    try {
+      return read(member);
+    } catch {
+      console.log(`${member.name}: リポジトリを取得できませんでした`);
+      return { ...member, repo: null, result: null, problem: null, share: null, failed: true };
+    }
+  });
+}
+
 const git = (dir, ...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
 // 了承した人を招待し、TEAM.md をチームのリポジトリへ反映する。
 function syncTeam(statuses, teamRepo, workDir) {
   const collaborators = JSON.parse(gh('api', `repos/${teamRepo}/collaborators`)).map((c) => c.login);
   for (const member of teamInviteTargets(statuses, collaborators)) {
-    gh('api', '--method', 'PUT', `repos/${teamRepo}/collaborators/${member.github}`, '-f', 'permission=push');
-    console.log(`チームのリポジトリに招待しました: ${member.name}`);
+    try {
+      gh('api', '--method', 'PUT', `repos/${teamRepo}/collaborators/${member.github}`, '-f', 'permission=push');
+      console.log(`チームのリポジトリに招待しました: ${member.name}`);
+    } catch {
+      console.log(`チームのリポジトリに招待できませんでした: ${member.name}`);
+    }
   }
   const dir = join(workDir, '_team');
   gh('repo', 'clone', teamRepo, dir, '--', '--quiet');
@@ -200,14 +221,17 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     acceptInvitations(members);
     const repos = courseRepos();
     const rules = loadRules();
-    const statuses = members.map((m) => memberStatus(m, repos, rules, workDir));
+    const statuses = collectStatuses(members, (m) => memberStatus(m, repos, rules, workDir));
     mkdirSync(join(root, 'out'), { recursive: true });
     const output = join(root, 'out', 'team.html');
     writeFileSync(output, renderPage(statuses));
     console.log(`チームのページを作りました: ${output}`);
     for (const m of [...statuses].sort(byName)) console.log(`${m.name}: ${currentLabel(m)}`);
     try {
-      syncTeam(statuses, loadConfig().teamRepo, workDir);
+      const config = loadConfig();
+      if (shouldSyncTeam(members, gh('api', 'user', '--jq', '.login').trim(), config.operatorGithub)) {
+        syncTeam(statuses, config.teamRepo, workDir);
+      }
     } catch {
       console.log('チームのリポジトリを更新できませんでした。');
     }

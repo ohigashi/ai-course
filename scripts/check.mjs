@@ -100,12 +100,22 @@ function checkUrl(repoDir, check, env) {
   return last && /^[23]/.test(last) ? [] : [`${check.label}(URL に届きません)`];
 }
 
+function ownChanges(status) {
+  const uncommitted = status.split('\n').filter((line) => /^[12?u] /.test(line)).map((line) => line.split(' ').pop());
+  return uncommitted.filter((path) => !COURSE_PATHS.some((p) => path.startsWith(p)));
+}
+
 function checkPushed(env, check) {
   if (env.git(['rev-parse', '@{u}']) === null) return [check.label];
   const status = env.git(['status', '--porcelain=v2', '--branch']) ?? '';
-  const uncommitted = status.split('\n').filter((line) => /^[12?u] /.test(line)).map((line) => line.split(' ').pop());
-  const ownChanges = uncommitted.filter((path) => !COURSE_PATHS.some((p) => path.startsWith(p)));
-  return /branch\.ab \+0 -0/.test(status) && ownChanges.length === 0 ? [] : [check.label];
+  return /branch\.ab \+0 -0/.test(status) && ownChanges(status).length === 0 ? [] : [check.label];
+}
+
+// 保存(commit と push)していない自分の作業があるか。段階の判定とは分ける。
+function hasUnsavedWork(env) {
+  const status = env.git(['status', '--porcelain=v2', '--branch']);
+  if (status === null) return false;
+  return !/branch\.ab \+0 -0/.test(status) || ownChanges(status).length > 0;
 }
 
 function repoSlug(env) {
@@ -150,6 +160,10 @@ function runCheck(repoDir, check, env) {
     }
     case 'url':
       return checkUrl(repoDir, check, env);
+    case 'team_pr': {
+      const text = readDoc(repoDir, check.path);
+      return text?.includes(`github.com/${check.repo}/pull/`) && new RegExp(`github\\.com/${check.repo}/pull/\\d+`).test(text) ? [] : [check.label];
+    }
     default:
       throw new Error(`unknown check type: ${check.type}`);
   }
@@ -190,7 +204,7 @@ export function evaluate(repoDir, rules, env) {
   });
   const current = stages.find((s) => !s.done && !s.optional);
   const lastCommitDate = env.git(['log', '-1', '--format=%cI'])?.trim() || null;
-  return { stages, currentStage: current ? current.id : null, lastCommitDate, claudeMd: claudeMdStatus(repoDir, env) };
+  return { stages, currentStage: current ? current.id : null, lastCommitDate, unsaved: hasUnsavedWork(env), claudeMd: claudeMdStatus(repoDir, env) };
 }
 
 function run(cmd, args, cwd) {

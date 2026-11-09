@@ -17,10 +17,6 @@
         "label": "CLAUDE.md を自分の言葉で書く"
       },
       {
-        "type": "pushed",
-        "label": "変更を GitHub に push する"
-      },
-      {
         "type": "invited",
         "github": "ohigashi",
         "label": "大東をリポジトリに招待する"
@@ -160,8 +156,9 @@
         "label": "docs/06-team.md を書く"
       },
       {
-        "type": "url",
+        "type": "team_pr",
         "path": "docs/06-team.md",
+        "repo": "ohigashi/ai-course-team",
         "label": "docs/06-team.md に反映した変更の URL を書く"
       }
     ]

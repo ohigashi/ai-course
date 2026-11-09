@@ -1,6 +1,6 @@
 ---
 name: course-status
-description: 大東が手元で使う。メンバーのリポジトリの進捗と成果を集計し、チームのページを作る。「/course-status」「チームの進捗を見たい」のときに使う。
+description: 大東が手元で使う。メンバーのリポジトリの進捗と成果を集計し、チームのページを作る。大東が「/course-status」と入力したときに使う。受講者には使わない。
 ---
 
 # /course-status

@@ -62,7 +62,9 @@ function check() {
   }
   git('fetch', '--quiet', 'course', 'main');
   const sha = git('rev-parse', 'course/main').trim();
-  const changes = git('diff', '--no-renames', '--no-ext-diff', '--name-status', '-R', sha, '--', ...COURSE_PATHS).trim();
+  // D は受講者の手元にだけあるファイル。受講者が作ったスキルなどなので、更新として扱わない。
+  const changes = git('diff', '--no-renames', '--no-ext-diff', '--name-status', '-R', sha, '--', ...COURSE_PATHS)
+    .split('\n').filter((line) => line && !line.startsWith('D')).join('\n');
   const settingsLine = settingsMissing() ? 'A\t.claude/settings.json(画面下の現在地の表示と、CLAUDE.md の見直しの案内を追加)' : '';
   const lines = [changes, settingsLine].filter(Boolean).join('\n');
   console.log(lines ? `更新があります(版: ${sha})\n${lines}` : 'コースは最新です。');

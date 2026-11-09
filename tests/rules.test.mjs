@@ -72,3 +72,7 @@ test('全段階の教材と、発展コースの一覧の全ファイルがあ�
   assert.ok(files.length >= 5);
   for (const f of files) assert.ok(existsSync(join(root, 'course/stepups', f)), f);
 });
+
+test('進み具合の条件に push を入れない', () => {
+  assert.ok(!loadRules().flatMap((r) => r.checks).some((c) => c.type === 'pushed'));
+});

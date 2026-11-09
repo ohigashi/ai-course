@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { renderPage, selectInvitations, quietMembers, problemOf, loadMembers, parseShare, renderTeamMd, teamInviteTargets, selectTeamInvitation } from '../scripts/status.mjs';
+import { renderPage, selectInvitations, quietMembers, problemOf, loadMembers, parseShare, renderTeamMd, teamInviteTargets, selectTeamInvitation, shouldSyncTeam, collectStatuses } from '../scripts/status.mjs';
 
 const result = (currentStage, lastCommitDate = '2026-11-09T10:00:00+09:00') => ({
   stages: [
@@ -138,4 +138,25 @@ test('招待の対象: どちらかの了承があり、まだ入っていない
 test('チームのリポジトリからの招待だけを選ぶ', () => {
   const invitations = [{ id: 1, repository: { full_name: 'o/team' } }, { id: 2, repository: { full_name: 'x/evil' } }];
   assert.deepEqual(selectTeamInvitation(invitations, 'o/team').map((i) => i.id), [1]);
+});
+
+test('チームへの反映は、メンバーがいて運営者本人が実行したときだけ', () => {
+  const members = [{ github: 'a' }];
+  assert.equal(shouldSyncTeam(members, 'ohigashi', 'ohigashi'), true);
+  assert.equal(shouldSyncTeam(members, 'OHIGASHI', 'ohigashi'), true);
+  assert.equal(shouldSyncTeam([], 'ohigashi', 'ohigashi'), false);
+  assert.equal(shouldSyncTeam(members, 'student', 'ohigashi'), false);
+});
+
+test('1人の取得に失敗しても他の人を集計し、失敗した人はチームに載せない', () => {
+  const list = collectStatuses([{ name: 'A', github: 'a' }, { name: 'B', github: 'b' }], (m) => {
+    if (m.github === 'a') throw new Error('clone failed');
+    return { ...m, result: result(1), share: shareOf(), outcome: { made: [], monthlySavedHours: 1 } };
+  });
+  assert.equal(list.length, 2);
+  assert.equal(list[0].failed, true);
+  assert.equal(list[0].share, null);
+  assert.ok(renderTeamMd(list).includes('### B'));
+  assert.ok(!renderTeamMd(list).includes('### A'));
+  assert.ok(renderPage(list).includes('A'));
 });

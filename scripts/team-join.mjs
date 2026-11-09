@@ -7,19 +7,23 @@ import { selectTeamInvitation } from './status.mjs';
 
 const gh = (...args) => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 
+let target;
 try {
   const { teamRepo } = loadConfig();
   for (const invitation of selectTeamInvitation(JSON.parse(gh('api', 'user/repository_invitations')), teamRepo)) {
     gh('api', '--method', 'PATCH', `user/repository_invitations/${invitation.id}`);
     console.log('チームのリポジトリへの招待を承諾しました。');
   }
-  const target = resolve('..', teamRepo.split('/')[1]);
-  if (existsSync(join(target, '.git'))) {
-    execFileSync('git', ['pull', '--quiet'], { cwd: target, stdio: 'ignore' });
-  } else {
-    gh('repo', 'clone', teamRepo, target, '--', '--quiet');
-  }
-  console.log(`チームのフォルダ: ${target}`);
+  target = resolve('..', teamRepo.split('/')[1]);
+  if (!existsSync(join(target, '.git'))) gh('repo', 'clone', teamRepo, target, '--', '--quiet');
 } catch {
-  console.log('チームのリポジトリに入れませんでした。共有の了承がまだか、大東の招待を待っている状態です。');
+  console.log('チームのリポジトリに入れませんでした。共有の了承がまだか、招待が届いていない状態です。');
+  process.exit(0);
 }
+
+try {
+  execFileSync('git', ['fetch', '--quiet', 'origin'], { cwd: target, stdio: 'ignore' });
+} catch {
+  console.log('チームの最新の状態を取得できませんでした。手元の内容を表示します。');
+}
+console.log(`チームのフォルダ: ${target}`);
