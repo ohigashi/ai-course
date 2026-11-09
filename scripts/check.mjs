@@ -16,7 +16,7 @@ function readDoc(repoDir, path) {
 
 const countChars = (text) => text.replace(/<!--[\s\S]*?-->/g, '').replace(/\s/g, '').length;
 
-function sections(text) {
+export function sections(text) {
   const result = new Map();
   let current = null;
   for (const line of text.split('\n')) {
