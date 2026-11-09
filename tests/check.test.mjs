@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { evaluate, readRepoFile } from '../scripts/check.mjs';
+import { evaluate, readRepoFile, claudeMdStatus, reminderText } from '../scripts/check.mjs';
 
 const noRemote = { git: () => null, gh: () => null };
 
@@ -160,4 +160,47 @@ test('headings: 見出しごとに下限を変えられる', () => {
   const check = { type: 'headings', path: 'p.md', headings: ['誰の', '何が困っているか'], minChars: 10, minCharsBy: { '誰の': 2 }, label: 'x' };
   const ok = '## 誰の\n自分\n\n## 何が困っているか\n月末の集計に毎回2時間かかる\n';
   assert.equal(evaluate(repo({ 'p.md': ok }), [stage(1, [check])], noRemote).stages[0].done, true);
+});
+
+const claudeGit = (date, commits) => (args) => {
+  if (args[0] === 'log' && args.includes('CLAUDE.md')) return `abc123 ${date}\n`;
+  if (args[0] === 'rev-list') return `${commits}\n`;
+  return null;
+};
+const now = new Date('2026-11-30T00:00:00+09:00');
+const written = () => repo({ 'CLAUDE.md': `## 仕事\n${longText}` });
+
+test('claudeMdStatus: 2週間たって作業があれば見直しの時期', () => {
+  const s = claudeMdStatus(written(), { git: claudeGit('2026-11-09T00:00:00+09:00', 1), gh: () => null }, now);
+  assert.equal(s.due, true);
+  assert.equal(s.commitsSince, 1);
+  assert.equal(s.daysSince, 21);
+});
+
+test('claudeMdStatus: 2週間たっても作業がなければ促さない', () => {
+  assert.equal(claudeMdStatus(written(), { git: claudeGit('2026-11-09T00:00:00+09:00', 0), gh: () => null }, now).due, false);
+});
+
+test('claudeMdStatus: 日が浅くても作業の保存が10回たまれば促す', () => {
+  assert.equal(claudeMdStatus(written(), { git: claudeGit('2026-11-29T00:00:00+09:00', 10), gh: () => null }, now).due, true);
+  assert.equal(claudeMdStatus(written(), { git: claudeGit('2026-11-29T00:00:00+09:00', 9), gh: () => null }, now).due, false);
+});
+
+test('claudeMdStatus: ひな形のままや git が使えないときは促さない', () => {
+  const tpl = repo({ 'CLAUDE.md': `<!-- template -->\n${longText}` });
+  assert.equal(claudeMdStatus(tpl, { git: claudeGit('2026-11-01T00:00:00+09:00', 20), gh: () => null }, now).due, false);
+  assert.equal(claudeMdStatus(written(), noRemote, now).due, false);
+});
+
+test('claudeMdStatus: 教材の更新は作業の回数に入れない', () => {
+  const calls = [];
+  const git = (args) => { calls.push(args); return claudeGit('2026-11-09T00:00:00+09:00', 1)(args); };
+  claudeMdStatus(written(), { git, gh: () => null }, now);
+  const revList = calls.find((a) => a[0] === 'rev-list');
+  for (const p of [':!course', ':!scripts', ':!.claude']) assert.ok(revList.includes(p));
+});
+
+test('reminderText: 時期なら案内を返し、そうでなければ空', () => {
+  assert.ok(reminderText({ due: true, daysSince: 21, commitsSince: 3 }).includes('/review-claude-md'));
+  assert.equal(reminderText({ due: false }), '');
 });

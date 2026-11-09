@@ -108,6 +108,29 @@ function runCheck(repoDir, check, env) {
   }
 }
 
+const REVIEW_AFTER_DAYS = 14;
+const REVIEW_AFTER_COMMITS = 10;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// CLAUDE.md を前回触ってからの日数と、受講者自身の作業の commit 数から、見直しの時期かを決める。
+export function claudeMdStatus(repoDir, env, now = new Date()) {
+  const text = readRepoFile(repoDir, 'CLAUDE.md');
+  if (text === null || text.includes(TEMPLATE_MARK)) return { due: false };
+  const last = env.git(['log', '-1', '--format=%H %cI', '--', 'CLAUDE.md'])?.trim();
+  if (!last) return { due: false };
+  const [sha, date] = last.split(' ');
+  const count = env.git(['rev-list', '--count', `${sha}..HEAD`, '--', '.', ':!course', ':!scripts', ':!.claude']);
+  const commitsSince = Number(count) || 0;
+  const daysSince = Math.floor((now - new Date(date)) / DAY_MS);
+  const due = (daysSince >= REVIEW_AFTER_DAYS && commitsSince >= 1) || commitsSince >= REVIEW_AFTER_COMMITS;
+  return { due, daysSince, commitsSince, lastUpdated: date };
+}
+
+export function reminderText(status) {
+  if (!status.due) return '';
+  return `CLAUDE.md を前回見直してから ${status.daysSince} 日、作業の保存が ${status.commitsSince} 回たまっています。受講者に最初の返答で、作業内容をもとに CLAUDE.md を見直せることを1文で伝え、/review-claude-md を案内してください。`;
+}
+
 export function evaluate(repoDir, rules, env) {
   const stages = rules.map((rule) => {
     const missing = rule.checks.flatMap((check) => runCheck(repoDir, check, env));
@@ -115,7 +138,7 @@ export function evaluate(repoDir, rules, env) {
   });
   const current = stages.find((s) => !s.done);
   const lastCommitDate = env.git(['log', '-1', '--format=%cI'])?.trim() || null;
-  return { stages, currentStage: current ? current.id : null, lastCommitDate };
+  return { stages, currentStage: current ? current.id : null, lastCommitDate, claudeMd: claudeMdStatus(repoDir, env) };
 }
 
 function run(cmd, args, cwd) {

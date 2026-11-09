@@ -23,6 +23,7 @@ function setup() {
   write(upstream, 'course/stage-0.md', '新しい教材');
   write(upstream, 'scripts/x.mjs', '// new');
   write(upstream, '.claude/skills/next/SKILL.md', 'new skill');
+  write(upstream, '.claude/settings.json', '{"new":true}');
   write(upstream, 'CLAUDE.md', 'テンプレートの CLAUDE');
   write(upstream, 'docs/01-tasks.md', 'テンプレートの棚卸し');
   git(upstream, 'add', '-A');
@@ -66,6 +67,7 @@ test('了承した版だけを適用し、受講者のファイルは変わら�
   assert.equal(readFileSync(join(learner, 'course/stage-0.md'), 'utf8'), '新しい教材');
   assert.equal(readFileSync(join(learner, 'scripts/x.mjs'), 'utf8'), '// new');
   assert.equal(readFileSync(join(learner, '.claude/skills/next/SKILL.md'), 'utf8'), 'new skill');
+  assert.equal(readFileSync(join(learner, '.claude/settings.json'), 'utf8'), '{"new":true}');
   assert.equal(readFileSync(join(learner, 'CLAUDE.md'), 'utf8'), '受講者の CLAUDE');
   assert.equal(readFileSync(join(learner, 'docs/01-tasks.md'), 'utf8'), '受講者の棚卸し');
 });

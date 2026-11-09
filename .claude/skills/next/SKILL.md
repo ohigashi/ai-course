@@ -9,7 +9,7 @@ description: コースのいまの段階と、次にやることを受講者に�
 
 ## 手順
 
-1. `node scripts/update-course.mjs` を実行する。「更新があります」と表示されたら、変更されるファイルを受講者に伝え、了承を得てから表示された版で `node scripts/update-course.mjs --apply=<版>` を実行する。了承がなければ手元の版で続ける
+1. `node scripts/update-course.mjs` を実行する。「更新があります」と表示されたら、変更されるファイルを受講者に伝え、了承を得てから表示された版で `node scripts/update-course.mjs --apply=<版>` を実行する。適用のあとにもう一度確認し、更新が残っていれば同じ手順で適用する。了承がなければ手元の版で続ける
 2. `node scripts/check.mjs` を実行し、JSON の結果を読む。段階の完了と未完了は、この結果だけで決める。自分の判断で完了にしない
 3. `currentStage` の教材 `course/stage-<番号>.md`、`CLAUDE.md`、`docs/` の作成中のファイルを読む
 4. 次の順で、短く返す
@@ -18,6 +18,10 @@ description: コースのいまの段階と、次にやることを受講者に�
    - 受講者の内容に合わせた助言
    - 段階を完了していれば、次の段階の案内
 5. `currentStage` が null のときは、用意された段階をすべて終えたことを伝え、次の段階は大東が準備することを案内する
+
+## CLAUDE.md の見直し
+
+`check.mjs` の結果の `claudeMd.due` が true なら、案内の最後に「作業内容をもとに CLAUDE.md を見直せます。`/review-claude-md` で進められます」と1文で添える。
 
 ## 教材の扱い
 

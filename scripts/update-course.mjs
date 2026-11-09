@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 
 const remote = process.env.AI_COURSE_REMOTE || 'https://github.com/ohigashi/ai-course.git';
-const COURSE_PATHS = ['course', 'scripts', '.claude/skills'];
+const COURSE_PATHS = ['course', 'scripts', '.claude/skills', '.claude/settings.json'];
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 const applyArg = process.argv.find((a) => a.startsWith('--apply='))?.slice('--apply='.length);
 
