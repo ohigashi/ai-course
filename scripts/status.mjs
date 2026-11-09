@@ -1,10 +1,10 @@
 // 大東の手元で実行し、メンバーのリポジトリに同じ判定をかけてチームのページを作る。
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { evaluate, createEnv, loadRules, sections } from './check.mjs';
+import { evaluate, createEnv, loadRules, sections, readRepoFile } from './check.mjs';
 
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -89,8 +89,8 @@ function memberStatus(member, repos, rules, workDir) {
   const dir = join(workDir, member.github);
   gh('repo', 'clone', repo.full_name, dir, '--', '--quiet');
   const result = evaluate(dir, rules, createEnv(dir, { assumeInvited: true }));
-  const problemPath = join(dir, 'docs', '01-problem.md');
-  const problem = existsSync(problemPath) ? problemOf(readFileSync(problemPath, 'utf8')) : null;
+  const text = readRepoFile(dir, 'docs/01-problem.md');
+  const problem = text === null ? null : problemOf(text);
   return { ...member, repo: repo.full_name, result, problem };
 }
 

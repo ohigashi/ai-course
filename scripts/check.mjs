@@ -1,16 +1,25 @@
 // コースの完了条件を判定する。AI を使わず、リポジトリの中身だけで決める。
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { readFileSync, existsSync, lstatSync, realpathSync } from 'node:fs';
+import { join, dirname, relative, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const TEMPLATE_MARK = '<!-- template -->';
 const COURSE_PATHS = ['course/', 'scripts/', '.claude/'];
 
-function readDoc(repoDir, path) {
+// 他の人のリポジトリも読むので、シンボリックリンクでリポジトリの外を読まない。
+export function readRepoFile(repoDir, path) {
   const full = join(repoDir, path);
-  if (!existsSync(full)) return null;
-  const text = readFileSync(full, 'utf8').replace(/\r\n?/g, '\n');
+  if (!existsSync(full) || !lstatSync(full).isFile()) return null;
+  const inside = relative(realpathSync(repoDir), realpathSync(full));
+  if (inside.startsWith('..') || isAbsolute(inside)) return null;
+  return readFileSync(full, 'utf8');
+}
+
+function readDoc(repoDir, path) {
+  const raw = readRepoFile(repoDir, path);
+  if (raw === null) return null;
+  const text = raw.replace(/\r\n?/g, '\n');
   return text.includes(TEMPLATE_MARK) ? null : text;
 }
 

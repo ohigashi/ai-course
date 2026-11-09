@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { evaluate } from '../scripts/check.mjs';
+import { evaluate, readRepoFile } from '../scripts/check.mjs';
 
 const noRemote = { git: () => null, gh: () => null };
 
@@ -131,4 +131,19 @@ test('pushed: 書いた内容が未 commit なら未完了、教材の更新だ�
   assert.equal(evaluate(repo({}), rules, withStatus('1 .M N... 100644 100644 100644 a b CLAUDE.md\n')).stages[0].done, false);
   assert.equal(evaluate(repo({}), rules, withStatus('? docs/memo.md\n')).stages[0].done, false);
   assert.equal(evaluate(repo({}), rules, withStatus('1 M. N... 100644 100644 100644 a b course/stage-0.md\n1 M. N... 100644 100644 100644 a b .claude/skills/next/SKILL.md\n')).stages[0].done, true);
+});
+
+test('リポジトリの外を指すシンボリックリンクは読まない', () => {
+  const outside = repo({ 'secret.md': longText });
+  const dir = repo({});
+  symlinkSync(join(outside, 'secret.md'), join(dir, 'a.md'));
+  symlinkSync(outside, join(dir, 'linked'));
+  assert.equal(readRepoFile(dir, 'a.md'), null);
+  assert.equal(readRepoFile(dir, 'linked/secret.md'), null);
+  const r = evaluate(dir, [stage(0, [{ type: 'file', path: 'a.md', minChars: 5, label: 'a' }])], noRemote);
+  assert.equal(r.stages[0].done, false);
+});
+
+test('リポジトリの中の通常のファイルは読める', () => {
+  assert.equal(readRepoFile(repo({ 'docs/a.md': '本文' }), 'docs/a.md'), '本文');
 });
