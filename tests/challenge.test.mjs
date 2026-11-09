@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { levelProgress, recordCompletion, canStart, loadCatalog } from '../scripts/challenge.mjs';
-import { syncMilestones, renderTimeline, teamMilestones, monthlyActivity, parseMilestones, syncSnapshots, parseSnapshots } from '../scripts/history.mjs';
+import { syncMilestones, renderTimeline, monthEvents, monthlyActivity, parseMilestones, syncSnapshots, parseSnapshots } from '../scripts/history.mjs';
+import { loadPhases } from '../scripts/phases.mjs';
+import { loadMechanisms } from '../scripts/mechanism.mjs';
+import { loadRoadmap } from '../scripts/roadmap.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,19 +48,31 @@ test('課題の一覧: 5レベルあり、各レベル2題以上で教材と評�
   assert.ok(rubric.includes('できたもの') && rubric.includes('プロセス'));
 });
 
-const state = (over = {}) => ({ stagesDone: [0, 1], phase: '学ぶ', levels: [], ...over });
+const state = (over = {}) => ({ stagesDone: [0, 1], phasesDone: [], levels: [], ...over });
 
 test('syncMilestones: 新しい節目だけを初めて確認した日付で追加する', () => {
   const first = syncMilestones([], state(), '2026-11-09');
-  assert.deepEqual(first.map((e) => e.key), ['stage:0', 'stage:1', 'phase:学ぶ']);
-  const second = syncMilestones(first, state({ stagesDone: [0, 1, 2], phase: '試す', levels: [1] }), '2026-11-10');
-  assert.deepEqual(second.slice(3).map((e) => [e.key, e.date]), [['stage:2', '2026-11-10'], ['phase:試す', '2026-11-10'], ['level:1', '2026-11-10']]);
-  assert.equal(syncMilestones(second, state({ stagesDone: [0, 1, 2], phase: '試す', levels: [1] }), '2026-11-11').length, second.length);
+  assert.deepEqual(first.map((e) => e.key), ['stage:0', 'stage:1']);
+  const next = state({ stagesDone: [0, 1, 2], phasesDone: [1], levels: [1] });
+  const second = syncMilestones(first, next, '2026-11-10');
+  assert.deepEqual(second.slice(2).map((e) => [e.key, e.date]), [['stage:2', '2026-11-10'], ['phase-done:1', '2026-11-10'], ['level:1', '2026-11-10']]);
+  assert.equal(syncMilestones(second, next, '2026-11-11').length, second.length);
 });
 
-test('syncMilestones: 位置が戻っても過去の節目は消えない', () => {
-  const events = syncMilestones([], state({ phase: '試す' }), '2026-11-09');
-  assert.ok(syncMilestones(events, state({ phase: '学ぶ' }), '2026-11-10').some((e) => e.key === 'phase:試す'));
+test('syncMilestones: フェーズの完了を節目にし、旧 phase:* の記録は残す', () => {
+  const old = [{ key: 'phase:慣れる', date: '2026-11-01' }];
+  const out = syncMilestones(old, { stagesDone: [0], phasesDone: [1], levels: [] }, '2026-11-09');
+  assert.ok(out.some((e) => e.key === 'phase:慣れる'));
+  assert.ok(out.some((e) => e.key === 'phase-done:1' && e.date === '2026-11-09'));
+});
+
+test('parseMilestones: phase-done を受け付け、旧 phase:* も捨てない', () => {
+  const parsed = parseMilestones('{"events":[{"key":"phase-done:1","date":"2026-11-09"},{"key":"phase:慣れる","date":"2026-11-01"}]}');
+  assert.equal(parsed.length, 2);
+});
+
+test('parseMilestones: mechanism:* は読み込まない', () => {
+  assert.equal(parseMilestones('{"events":[{"key":"mechanism:git-undo","date":"2026-11-09"}]}').length, 0);
 });
 
 test('renderTimeline: 日付順の文にする', () => {
@@ -67,9 +82,13 @@ test('renderTimeline: 日付順の文にする', () => {
   assert.ok(lines[1].includes('課題解決 レベル1'));
 });
 
-test('teamMilestones: 「継続される」はチームに出さない', () => {
-  const list = teamMilestones([{ key: 'phase:継続される', date: 'd' }, { key: 'phase:試す', date: 'd' }, { key: 'level:1', date: 'd' }]);
-  assert.deepEqual(list.map((e) => e.key), ['phase:試す', 'level:1']);
+test('renderTimeline: 段階の語を使わず、旧 phase:* は表示しない', () => {
+  const text = renderTimeline([{ key: 'stage:2', date: '2026-11-02' }, { key: 'phase-done:1', date: '2026-11-03' }, { key: 'phase:慣れる', date: '2026-11-01' }, { key: 'mechanism:git-undo', date: '2026-11-04' }], loadRoadmap(), { phases: loadPhases(), mechanisms: loadMechanisms() });
+  assert.deepEqual(text.split('\n'), ['2026-11-02 小さな自動化 を終えた', '2026-11-03 フェーズ1 作ってみる を終えた', '2026-11-04 仕組みのお題「変更を読み、元に戻す」を解いた']);
+});
+
+test('monthEvents: その月の出来事だけを返す', () => {
+  assert.deepEqual(monthEvents([{ key: 'a', date: '2026-10-31' }, { key: 'b', date: '2026-11-01' }], '2026-11'), [{ key: 'b', date: '2026-11-01' }]);
 });
 
 test('monthlyActivity: 月ごとの日数', () => {
@@ -90,12 +109,6 @@ test('parseMilestones: 決まった形の節目だけを受け付け、件数に
   assert.deepEqual(parseMilestones(JSON.stringify({ events })).map((e) => e.key), ['stage:1', 'level:2', 'phase:試す']);
   const many = Array.from({ length: 1000 }, (_, i) => ({ key: `stage:${i}`, date: '2026-11-09' }));
   assert.equal(parseMilestones(JSON.stringify({ events: many })).length, 200);
-});
-
-test('syncMilestones: 「継続される」に達した日に、実装の節目も残す', () => {
-  const keys = syncMilestones([{ key: 'phase:慣れる', date: 'x' }], state({ phase: '継続される' }), '2026-11-20').map((e) => e.key);
-  assert.ok(keys.includes('phase:仕組みとして実装する'));
-  assert.ok(keys.includes('phase:継続される'));
 });
 
 test('syncSnapshots: 月ごとに1件で、同じ月は更新する', () => {

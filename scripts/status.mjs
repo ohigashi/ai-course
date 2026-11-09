@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { parseMilestones, parseSnapshots, renderTimeline, teamMilestones } from './history.mjs';
+import { parseMilestones, parseSnapshots, renderTimeline } from './history.mjs';
 import { loadRoadmap } from './roadmap.mjs';
 import { evaluate, createEnv, loadRules, loadConfig, sections, readRepoFile, listFiles, parseSavings, urlOf } from './check.mjs';
 import { loadPhases, phaseOfStage } from './phases.mjs';
@@ -89,8 +89,8 @@ export function renderTeamMd(members) {
     if (m.share.problem) lines.push(`- 取り組んでいる課題: ${m.share.problem}`);
     if (count || m.share.made) lines.push(`- 作ったもの: ${count}件${m.share.made ? `。${m.share.made}` : ''}`);
     if (m.outcome?.monthlySavedHours) lines.push(`- 減らした時間: 月 ${m.outcome.monthlySavedHours}時間`);
-    const steps = m.share.milestones ? teamMilestones(m.milestones ?? []) : [];
-    if (steps.length) lines.push('- これまでの歩み:', ...renderTimeline(steps, loadRoadmap()).split('\n').map((l) => `  - ${l}`));
+    const steps = m.share.milestones ? renderTimeline(m.milestones ?? [], loadRoadmap(), { phases: loadPhases(), mechanisms: [] }) : '';
+    if (steps) lines.push('- これまでの歩み:', ...steps.split('\n').map((l) => `  - ${l}`));
     lines.push('');
   }
   const tips = shared.flatMap((m) => (m.share.tips ?? []).map((tip) => `- ${tip}(${m.name})`));
@@ -149,7 +149,8 @@ function outcomeCell(member) {
 }
 
 function journeyCell(member) {
-  const steps = member.milestones?.length ? renderTimeline(member.milestones, loadRoadmap()).split('\n').map(escapeHtml) : [];
+  const text = member.milestones?.length ? renderTimeline(member.milestones, loadRoadmap(), { phases: loadPhases(), mechanisms: [] }) : '';
+  const steps = text ? text.split('\n').map(escapeHtml) : [];
   const values = (member.snapshots ?? []).map((v) => `${escapeHtml(v.month)}: 作ったもの ${v.made}件、月 ${v.savedHours}時間`);
   return [...steps, ...values].join('<br>') || '-';
 }

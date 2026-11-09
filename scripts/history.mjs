@@ -6,13 +6,14 @@ import { createCliEnv, evaluate, listFiles, loadRules, parseSavings, readRepoFil
 import { levelProgress, loadCatalog, parseCompleted } from './challenge.mjs';
 import { isRealDate, parseActivity, LEGACY_PHASES, todayString } from './activity.mjs';
 import { loadRoadmap } from './roadmap.mjs';
+import { loadPhases, phaseMarks } from './phases.mjs';
+import { loadMechanisms, parseMechanismLog } from './mechanism.mjs';
 
 const MILESTONES_FILE = 'milestones.json';
-const HIDDEN_FROM_TEAM = 'phase:継続される';
 
 const MAX_EVENTS = 200;
 const isValidKey = (key) => typeof key === 'string'
-  && (/^(stage|level):\d{1,3}$/.test(key) || (key.startsWith('phase:') && LEGACY_PHASES.includes(key.slice('phase:'.length))));
+  && (/^(stage|level|phase-done):\d{1,3}$/.test(key) || (key.startsWith('phase:') && LEGACY_PHASES.includes(key.slice('phase:'.length))));
 
 // 他の人にも見える一覧に載るので、決まった形の節目だけを受け付ける。
 export function parseMilestones(text) {
@@ -25,10 +26,9 @@ export function parseMilestones(text) {
   }
 }
 
+// 旧 phase:* の記録は events にそのまま残る(表示はしない)。mechanism:* はここに書かない。
 export function syncMilestones(events, state, today) {
-  // 「継続される」はチームに見せないので、同じ日に実装の節目も残して推測できないようにする。
-  const phases = state.phase === '継続される' ? ['仕組みとして実装する', state.phase] : [state.phase];
-  const keys = [...state.stagesDone.map((id) => `stage:${id}`), ...phases.map((p) => `phase:${p}`), ...state.levels.map((n) => `level:${n}`)];
+  const keys = [...state.stagesDone.map((id) => `stage:${id}`), ...state.phasesDone.map((id) => `phase-done:${id}`), ...state.levels.map((n) => `level:${n}`)];
   const known = new Set(events.map((e) => e.key));
   return [...events, ...keys.filter((key) => !known.has(key)).map((key) => ({ key, date: today }))];
 }
@@ -47,18 +47,21 @@ export function parseSnapshots(text) {
 
 export const syncSnapshots = (snapshots, month, made, savedHours) => [...snapshots.filter((s) => s.month !== month), { month, made, savedHours }];
 
-function label(key, roadmap) {
+function label(key, { roadmap, phases, mechanisms }) {
   const [type, value] = key.split(':');
-  if (type === 'stage') return `段階${value} ${roadmap.find((s) => String(s.id) === value)?.title ?? ''} を終えた`.replace('  ', ' ');
+  if (type === 'stage') return `${roadmap.find((s) => String(s.id) === value)?.title ?? ''} を終えた`.trim();
   if (type === 'level') return `課題解決 レベル${value} を終えた`;
-  return `位置が「${value}」に進んだ`;
+  if (type === 'phase-done') return `フェーズ${value} ${phases.find((p) => String(p.id) === value)?.title ?? ''} を終えた`.replace('  ', ' ');
+  return `仕組みのお題「${mechanisms.find((m) => m.id === value)?.title ?? value}」を解いた`;
 }
 
-export function renderTimeline(events, roadmap) {
-  return [...events].sort((a, b) => a.date.localeCompare(b.date)).map((e) => `${e.date} ${label(e.key, roadmap)}`).join('\n');
+// 旧 phase:* は表示しない。mechanisms は題名を引くための一覧(course/mechanisms.json)。
+export function renderTimeline(events, roadmap, { phases = [], mechanisms = [] } = {}) {
+  return events.filter((e) => !e.key.startsWith('phase:')).sort((a, b) => a.date.localeCompare(b.date))
+    .map((e) => `${e.date} ${label(e.key, { roadmap, phases, mechanisms })}`).join('\n');
 }
 
-export const teamMilestones = (events) => events.filter((e) => e.key !== HIDDEN_FROM_TEAM);
+export const monthEvents = (events, month) => events.filter((e) => e.date.startsWith(month));
 
 export function monthlyActivity(days) {
   const counts = new Map();
@@ -73,12 +76,20 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const levels = levelProgress(parseCompleted(read('challenges.json')), loadCatalog()).completedLevels;
   const stagesDone = result.stages.filter((s) => s.done && s.id !== 7).map((s) => s.id);
   const current = read(MILESTONES_FILE);
-  const events = syncMilestones(parseMilestones(current), { stagesDone, phase: result.phase, levels }, todayString());
+  const phases = loadPhases();
+  const phasesDone = phaseMarks(result, phases).filter((p) => p.mark === '済').map((p) => p.id);
+  const events = syncMilestones(parseMilestones(current), { stagesDone, phasesDone, levels }, todayString());
   const log = readRepoFile(repoDir, 'docs/02-log.md');
   const made = listFiles(repoDir, 'work').length + listFiles(repoDir, 'app').length;
   const snapshots = syncSnapshots(parseSnapshots(current), todayString().slice(0, 7), made, log === null ? 0 : parseSavings(log)?.monthlySavedHours ?? 0);
   writeFileSync(MILESTONES_FILE, `${JSON.stringify({ events, snapshots }, null, 2)}\n`);
-  console.log(renderTimeline(events, loadRoadmap()));
+  // 仕組みのお題は手元の記録から表示のときだけ合わせる(milestones.json には書かない)
+  const mechanisms = loadMechanisms();
+  const shown = [...events, ...parseMechanismLog(read('.local/mechanisms.json')).map((m) => ({ key: `mechanism:${m.id}`, date: m.date }))];
+  const labels = { phases, mechanisms };
+  const thisMonth = monthEvents(shown, todayString().slice(0, 7));
+  if (thisMonth.length) console.log(`今月できたこと\n${renderTimeline(thisMonth, loadRoadmap(), labels)}\n`);
+  console.log(renderTimeline(shown, loadRoadmap(), labels));
   const months = monthlyActivity(parseActivity(read('activity.json')));
   if (months.length) console.log(`\n月ごとの活用日数\n${months.map((m) => `${m.month}: ${m.days}日`).join('\n')}`);
   console.log(`\n作ったものと減らした時間の変化\n${snapshots.map((s) => `${s.month}: 作ったもの ${s.made}件、減らした時間 月 ${s.savedHours}時間`).join('\n')}`);
