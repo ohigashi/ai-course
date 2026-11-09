@@ -9,7 +9,7 @@ description: コースのいまの段階と、次にやることを受講者に�
 
 ## 手順
 
-1. `node scripts/update-course.mjs` を実行する
+1. `node scripts/update-course.mjs` を実行する。「仕組みの更新があります」と表示されたら、変更されるファイルを受講者に伝え、了承を得てから `node scripts/update-course.mjs --apply-code` を実行する。了承がなければ手元の版で続ける
 2. `node scripts/check.mjs` を実行し、JSON の結果を読む。段階の完了と未完了は、この結果だけで決める。自分の判断で完了にしない
 3. `currentStage` の教材 `course/stage-<番号>.md`、`CLAUDE.md`、`docs/` の作成中のファイルを読む
 4. 次の順で、短く返す

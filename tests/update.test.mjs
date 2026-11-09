@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,14 +39,17 @@ function setup() {
   return { upstream, learner };
 }
 
-const run = (cwd, url) => spawnSync(process.execPath, [script], { cwd, encoding: 'utf8', env: { ...process.env, AI_COURSE_REMOTE: url } });
+const run = (cwd, url, ...args) => spawnSync(process.execPath, [script, ...args], { cwd, encoding: 'utf8', env: { ...process.env, AI_COURSE_REMOTE: url } });
 
 test('教材は更新され、受講者のファイルは変わらない', () => {
   const { upstream, learner } = setup();
   const r = run(learner, upstream);
   assert.equal(r.status, 0);
   assert.equal(readFileSync(join(learner, 'course/stage-0.md'), 'utf8'), '新しい教材');
-  assert.equal(readFileSync(join(learner, '.claude/skills/next/SKILL.md'), 'utf8'), 'new skill');
+  assert.equal(existsSync(join(learner, '.claude/skills/next/SKILL.md')), false);
+  assert.equal(existsSync(join(learner, 'scripts/x.mjs')), false);
+  assert.ok(r.stdout.includes('仕組みの更新があります'));
+  assert.ok(r.stdout.includes('scripts/x.mjs'));
   assert.equal(readFileSync(join(learner, 'CLAUDE.md'), 'utf8'), '受講者の CLAUDE');
   assert.equal(readFileSync(join(learner, 'docs/01-tasks.md'), 'utf8'), '受講者の棚卸し');
 });
@@ -63,4 +66,13 @@ test('リモートに届かなくても終了コード 0 で手元の版を案�
   assert.equal(r.status, 0);
   assert.ok(r.stdout.includes('手元の版で続けます'));
   assert.equal(readFileSync(join(learner, 'course/stage-0.md'), 'utf8'), '古い教材');
+});
+
+test('確認のあと --apply-code でスクリプトとスキルも更新する', () => {
+  const { upstream, learner } = setup();
+  const r = run(learner, upstream, '--apply-code');
+  assert.equal(r.status, 0);
+  assert.equal(readFileSync(join(learner, 'scripts/x.mjs'), 'utf8'), '// new');
+  assert.equal(readFileSync(join(learner, '.claude/skills/next/SKILL.md'), 'utf8'), 'new skill');
+  assert.equal(readFileSync(join(learner, 'CLAUDE.md'), 'utf8'), '受講者の CLAUDE');
 });
