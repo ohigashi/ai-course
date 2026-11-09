@@ -71,6 +71,8 @@ const PLACEHOLDER_FILES = new Set(['.gitkeep', 'README.md']);
 export function listFiles(repoDir, dir) {
   const full = join(repoDir, dir);
   if (!existsSync(full) || !lstatSync(full).isDirectory()) return [];
+  const inside = relative(realpathSync(repoDir), realpathSync(full));
+  if (inside.startsWith('..') || isAbsolute(inside)) return [];
   return readdirSync(full, { recursive: true, withFileTypes: true })
     .filter((e) => e.isFile() && !PLACEHOLDER_FILES.has(e.name) && !`${e.parentPath}`.includes('node_modules'))
     .map((e) => e.name);

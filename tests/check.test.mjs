@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { loadRules, evaluate, readRepoFile, claudeMdStatus, reminderText, parseSavings, updateReminderText } from '../scripts/check.mjs';
+import { loadRules, evaluate, listFiles, readRepoFile, claudeMdStatus, reminderText, parseSavings, updateReminderText } from '../scripts/check.mjs';
 
 const noRemote = { git: () => null, gh: () => null };
 
@@ -374,4 +374,14 @@ test('evaluate: 取り組みの判定はファイルを書かない', () => {
   const dir = repo({});
   evaluate(dir, loadRules(), { ...noRemote, assumeInvited: true });
   assert.equal(readRepoFile(dir, 'works.json'), null);
+});
+
+test('listFiles: 途中がリポジトリの外へのシンボリックリンクなら読まない', () => {
+  const outside = repo({ 'work/a.txt': '外のファイル' }, 'outside-');
+  const dir = repo({});
+  mkdirSync(join(dir, 'works'));
+  symlinkSync(outside, join(dir, 'works', 'w1'));
+  assert.deepEqual(listFiles(dir, 'works/w1/work'), []);
+  const inner = repo({ 'works/w1/work/a.txt': '中のファイル' });
+  assert.deepEqual(listFiles(inner, 'works/w1/work'), ['a.txt']);
 });
