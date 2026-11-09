@@ -4,7 +4,15 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const remote = process.env.AI_COURSE_REMOTE || 'https://github.com/ohigashi/ai-course.git';
+function configuredRemote() {
+  try {
+    return `https://github.com/${JSON.parse(readFileSync(join('course', 'config.json'), 'utf8')).courseRepo}.git`;
+  } catch {
+    return 'https://github.com/ohigashi/ai-course.git';
+  }
+}
+
+const remote = process.env.AI_COURSE_REMOTE || configuredRemote();
 const COURSE_PATHS = ['course', 'scripts', '.claude/skills'];
 const SETTINGS_PATH = join('.claude', 'settings.json');
 const REMINDER_COMMAND = 'node scripts/session-reminder.mjs';

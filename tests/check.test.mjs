@@ -241,3 +241,14 @@ test('updateReminderText: 更新があれば案内し、無ければ空', () => 
   assert.equal(updateReminderText('コースは最新です。\n'), '');
   assert.equal(updateReminderText(null), '');
 });
+
+test('optional の段階は currentStage に数えない', () => {
+  const rules = [
+    stage(0, [{ type: 'file', path: 'a.md', minChars: 5, label: 'a' }]),
+    { ...stage(6, [{ type: 'file', path: 'x.md', minChars: 5, label: 'x' }]), optional: true },
+  ];
+  const r = evaluate(repo({ 'a.md': longText }), rules, noRemote);
+  assert.equal(r.currentStage, null);
+  assert.equal(r.stages[1].done, false);
+  assert.equal(r.stages[1].optional, true);
+});

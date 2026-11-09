@@ -26,7 +26,8 @@ test('rules.json の全パスがひな形に存在する', () => {
 });
 
 test('段階は0から5まで順に並ぶ', () => {
-  assert.deepEqual(loadRules().map((r) => r.id), [0, 1, 2, 3, 4, 5]);
+  assert.deepEqual(loadRules().map((r) => r.id), [0, 1, 2, 3, 4, 5, 6]);
+  assert.equal(loadRules().find((r) => r.id === 6).optional, true);
 });
 
 test('ひな形のままでは段階0も1も未完了', () => {
@@ -65,7 +66,7 @@ test('ひな形の docs は段階2以降でも未完了', () => {
 });
 
 test('全段階の教材と、発展コースの一覧の全ファイルがある', () => {
-  for (const id of [0, 1, 2, 3, 4, 5]) assert.ok(existsSync(join(root, 'course', `stage-${id}.md`)), `stage-${id}`);
+  for (const id of [0, 1, 2, 3, 4, 5, 6]) assert.ok(existsSync(join(root, 'course', `stage-${id}.md`)), `stage-${id}`);
   const index = readFileSync(join(root, 'course/stepups/index.md'), 'utf8');
   const files = [...index.matchAll(/`([a-z-]+\.md)`/g)].map((m) => m[1]);
   assert.ok(files.length >= 5);

@@ -41,6 +41,18 @@ test('画面下の表示: 準備中の段階では次の案内を出さない', 
   assert.equal(statusLine(result(null), roadmap), 'コース 3/3 小さな自動化(準備中)');
 });
 
-test('コースの全体は6段階', () => {
-  assert.deepEqual(loadRoadmap().map((s) => s.title), ['環境づくり', '課題の洗い出し', '小さな自動化', 'プロダクト化', 'アプリ開発', '公開と運用']);
+test('コースの全体は基本の6段階と並行のチームで作る', () => {
+  assert.deepEqual(loadRoadmap().map((s) => s.title), ['環境づくり', '課題の洗い出し', '小さな自動化', 'プロダクト化', 'アプリ開発', '公開と運用', 'チームで作る']);
+});
+
+const withTeam = [...roadmap, { id: 6, title: 'チームで作る', goal: '共同で作る', optional: true, availableAfter: 1 }];
+
+test('並行の段階は分母に数えず、参加できる時期を示す', () => {
+  assert.ok(statusLine(result(1), withTeam).startsWith('コース 2/3 '));
+  const early = renderRoadmap(result(1), withTeam).split('\n').find((l) => l.includes('チームで作る'));
+  assert.match(early, /^-/);
+  assert.match(early, /段階1のあとに参加できます/);
+  const open = renderRoadmap(result(null), withTeam).split('\n').find((l) => l.includes('チームで作る'));
+  assert.match(open, /^可/);
+  assert.ok(!open.includes('いまここ'));
 });

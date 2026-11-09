@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { renderPage, selectInvitations, quietMembers, problemOf, loadMembers } from '../scripts/status.mjs';
+import { renderPage, selectInvitations, quietMembers, problemOf, loadMembers, parseShare, renderTeamMd, teamInviteTargets, selectTeamInvitation } from '../scripts/status.mjs';
 
 const result = (currentStage, lastCommitDate = '2026-11-09T10:00:00+09:00') => ({
   stages: [
@@ -86,4 +86,56 @@ test('成果: 作ったもの、減らした時間、公開URLと月の合計を
   assert.ok(html.includes('本人の記録による'));
   assert.ok(html.includes('https://example.com/&lt;x&gt;'));
   assert.ok(html.includes('発展コース 1件'));
+});
+
+const shareOf = (over = {}) => ({ share: true, project: true, problem: '月末の集計に時間がかかる', made: '集計の自動化', ...over });
+
+test('parseShare: true だけを了承とし、壊れたものは null', () => {
+  assert.equal(parseShare('{ broken'), null);
+  assert.equal(parseShare(null), null);
+  assert.equal(parseShare('{"share":"true","project":1}').share, false);
+  assert.equal(parseShare('{"share":"true","project":1}').project, false);
+  assert.equal(parseShare('{"share":true}').share, true);
+  assert.equal(parseShare('[1]'), null);
+});
+
+test('parseShare: 文は1行にして長さを制限する', () => {
+  const s = parseShare(JSON.stringify({ share: true, problem: `a\nb${'x'.repeat(300)}`, made: 5 }));
+  assert.ok(!s.problem.includes('\n'));
+  assert.ok(s.problem.length <= 120);
+  assert.equal(s.made, '');
+});
+
+test('TEAM.md: 了承した人だけを名前順で載せ、合計も了承した人だけで計算する', () => {
+  const a = { ...member('鈴木', 's', 1), share: shareOf(), outcome: { made: ['secret-client.py', 'b'], monthlySavedHours: 2 } };
+  const b = { ...member('中村', 'n', 0), share: shareOf({ problem: '営業資料の更新' }), outcome: { made: [], monthlySavedHours: 3 } };
+  const c = { ...member('非共有', 'x', 1), share: shareOf({ share: false, problem: '見せない課題' }), outcome: { made: [], monthlySavedHours: 100 } };
+  const d = { ...member('未回答', 'y', 1), share: null, outcome: { made: [], monthlySavedHours: 50 } };
+  const md = renderTeamMd([a, c, d, b]);
+  assert.ok(md.indexOf('中村') < md.indexOf('鈴木'));
+  assert.ok(!md.includes('非共有') && !md.includes('見せない課題') && !md.includes('未回答'));
+  assert.ok(md.includes('5時間'));
+  assert.ok(!md.includes('105時間'));
+  assert.ok(md.includes('営業資料の更新'));
+  assert.ok(md.includes('2件'));
+  assert.ok(md.includes('集計の自動化'));
+  assert.ok(!md.includes('secret-client.py'));
+  assert.ok(!md.includes('2週間'));
+  assert.ok(!md.includes('CLAUDE.md を書く'));
+});
+
+test('招待の対象: どちらかの了承があり、まだ入っていない人', () => {
+  const list = [
+    { github: 'a', share: shareOf({ project: false }) },
+    { github: 'b', share: shareOf({ share: false, project: true }) },
+    { github: 'c', share: shareOf({ share: false, project: false }) },
+    { github: 'd', share: shareOf() },
+    { github: 'e', share: null },
+  ];
+  assert.deepEqual(teamInviteTargets(list, ['D']).map((m) => m.github), ['a', 'b']);
+});
+
+test('チームのリポジトリからの招待だけを選ぶ', () => {
+  const invitations = [{ id: 1, repository: { full_name: 'o/team' } }, { id: 2, repository: { full_name: 'x/evil' } }];
+  assert.deepEqual(selectTeamInvitation(invitations, 'o/team').map((i) => i.id), [1]);
 });

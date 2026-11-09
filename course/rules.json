@@ -140,5 +140,30 @@
         "label": "docs/05-launch.md に公開後の改善を書く"
       }
     ]
+  },
+  {
+    "id": 6,
+    "title": "チームで作る",
+    "optional": true,
+    "availableAfter": 2,
+    "checks": [
+      {
+        "type": "headings",
+        "path": "docs/06-team.md",
+        "headings": [
+          "参加したプロジェクト",
+          "自分の役割",
+          "届けたもの",
+          "チームの決まりに加えたこと"
+        ],
+        "minChars": 5,
+        "label": "docs/06-team.md を書く"
+      },
+      {
+        "type": "url",
+        "path": "docs/06-team.md",
+        "label": "docs/06-team.md に反映した変更の URL を書く"
+      }
+    ]
   }
 ]

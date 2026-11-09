@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { evaluate, createEnv, loadRules, sections, readRepoFile, listFiles, parseSavings, urlOf } from './check.mjs';
+import { evaluate, createEnv, loadRules, loadConfig, sections, readRepoFile, listFiles, parseSavings, urlOf } from './check.mjs';
 
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -27,6 +27,54 @@ export function problemOf(text) {
 export function loadMembers(root) {
   const path = join(root, 'members.local.json');
   return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : [];
+}
+
+const SHARE_TEXT_LIMIT = 120;
+const shareText = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, SHARE_TEXT_LIMIT) : '');
+
+// team-share.json を読む。true だけを了承として扱う。
+export function parseShare(text) {
+  if (text === null) return null;
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  return { share: data.share === true, project: data.project === true, problem: shareText(data.problem), made: shareText(data.made) };
+}
+
+export function teamInviteTargets(members, collaborators) {
+  const joined = new Set(collaborators.map((c) => c.toLowerCase()));
+  return members.filter((m) => (m.share?.share || m.share?.project) && !joined.has(m.github.toLowerCase()));
+}
+
+export const selectTeamInvitation = (invitations, teamRepo) =>
+  invitations.filter((i) => i.repository?.full_name?.toLowerCase() === teamRepo.toLowerCase());
+
+export function renderTeamMd(members) {
+  const shared = members.filter((m) => m.share?.share).sort(byName);
+  const counts = new Map();
+  for (const m of shared) counts.set(currentLabel(m), (counts.get(currentLabel(m)) ?? 0) + 1);
+  const total = Math.round(shared.reduce((sum, m) => sum + (m.outcome?.monthlySavedHours ?? 0), 0) * 10) / 10;
+  const lines = [
+    '# チームの進捗と成果', '',
+    'このファイルは自動で作られます。手で編集しません。載っているのは、本人が了承した内容だけです。', '',
+    '## 全体', '',
+    ...[...counts].map(([label, n]) => `- ${label}: ${n}人`),
+    `- 減らした時間の月合計: ${total}時間(本人の記録による)`, '',
+    '## メンバー', '',
+  ];
+  for (const m of shared) {
+    const count = m.outcome?.made?.length ?? 0;
+    lines.push(`### ${m.name}`, '', `- いまの段階: ${currentLabel(m)}`);
+    if (m.share.problem) lines.push(`- 取り組んでいる課題: ${m.share.problem}`);
+    if (count || m.share.made) lines.push(`- 作ったもの: ${count}件${m.share.made ? `。${m.share.made}` : ''}`);
+    if (m.outcome?.monthlySavedHours) lines.push(`- 減らした時間: 月 ${m.outcome.monthlySavedHours}時間`);
+    lines.push('');
+  }
+  return `${lines.join('\n').trimEnd()}\n`;
 }
 
 function currentLabel(member) {
@@ -120,7 +168,27 @@ function memberStatus(member, repos, rules, workDir) {
     url: launch === null ? null : urlOf(launch),
     stepups: listFiles(dir, 'docs/stepups').length,
   };
-  return { ...member, repo: repo.full_name, result, problem, outcome };
+  return { ...member, repo: repo.full_name, result, problem, outcome, share: parseShare(readRepoFile(dir, 'team-share.json')) };
+}
+
+const git = (dir, ...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+
+// 了承した人を招待し、TEAM.md をチームのリポジトリへ反映する。
+function syncTeam(statuses, teamRepo, workDir) {
+  const collaborators = JSON.parse(gh('api', `repos/${teamRepo}/collaborators`)).map((c) => c.login);
+  for (const member of teamInviteTargets(statuses, collaborators)) {
+    gh('api', '--method', 'PUT', `repos/${teamRepo}/collaborators/${member.github}`, '-f', 'permission=push');
+    console.log(`チームのリポジトリに招待しました: ${member.name}`);
+  }
+  const dir = join(workDir, '_team');
+  gh('repo', 'clone', teamRepo, dir, '--', '--quiet');
+  writeFileSync(join(dir, 'TEAM.md'), renderTeamMd(statuses));
+  if (git(dir, 'status', '--porcelain').trim()) {
+    git(dir, 'add', 'TEAM.md');
+    git(dir, 'commit', '-q', '-m', 'TEAM.md を更新する');
+    git(dir, 'push', '-q');
+    console.log('TEAM.md を更新しました。');
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -138,6 +206,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     writeFileSync(output, renderPage(statuses));
     console.log(`チームのページを作りました: ${output}`);
     for (const m of [...statuses].sort(byName)) console.log(`${m.name}: ${currentLabel(m)}`);
+    try {
+      syncTeam(statuses, loadConfig().teamRepo, workDir);
+    } catch {
+      console.log('チームのリポジトリを更新できませんでした。');
+    }
     const quiet = quietMembers(statuses);
     if (quiet.length) console.log(`2週間以上更新がない人(声をかける候補): ${quiet.map((m) => m.name).join('、')}`);
   } finally {

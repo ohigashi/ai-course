@@ -186,9 +186,9 @@ export function updateReminderText(output) {
 export function evaluate(repoDir, rules, env) {
   const stages = rules.map((rule) => {
     const missing = rule.checks.flatMap((check) => runCheck(repoDir, check, env));
-    return { id: rule.id, title: rule.title, done: missing.length === 0, missing };
+    return { id: rule.id, title: rule.title, optional: Boolean(rule.optional), done: missing.length === 0, missing };
   });
-  const current = stages.find((s) => !s.done);
+  const current = stages.find((s) => !s.done && !s.optional);
   const lastCommitDate = env.git(['log', '-1', '--format=%cI'])?.trim() || null;
   return { stages, currentStage: current ? current.id : null, lastCommitDate, claudeMd: claudeMdStatus(repoDir, env) };
 }
@@ -207,6 +207,11 @@ export function createEnv(repoDir, options = {}) {
     gh: (args) => run('gh', args, repoDir),
     ...options,
   };
+}
+
+export function loadConfig() {
+  const root = dirname(dirname(fileURLToPath(import.meta.url)));
+  return JSON.parse(readFileSync(join(root, 'course', 'config.json'), 'utf8'));
 }
 
 export function loadRules() {
