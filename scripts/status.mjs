@@ -50,7 +50,7 @@ export function parseShare(text) {
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
   const tips = Array.isArray(data.tips) ? data.tips.filter((t) => typeof t === 'string').map(shareText).filter(Boolean).slice(0, 5) : [];
-  return { share: data.share === true, project: data.project === true, problem: shareText(data.problem), made: shareText(data.made), tips, milestones: data.milestones === true, declined: data.share === false && data.project === false };
+  return { share: data.share === true, project: data.project === true, problem: shareText(data.problem), made: shareText(data.made), tips, milestones: data.milestones === true, works: data.works === true, declined: data.share === false && data.project === false };
 }
 
 export function teamInviteTargets(members, collaborators) {
@@ -88,7 +88,7 @@ export function renderTeamMd(members) {
     lines.push(`### ${m.name}`, '');
     lines.push(`- いまのフェーズ: ${currentLabel(m)}`);
     const active = (m.works ?? []).filter((w) => w.state === 'active');
-    if (active.length) lines.push(`- 進めていること: ${active.map((w) => w.name).join('、')}`);
+    if (m.share.works === true && active.length) lines.push(`- 進めていること: ${active.map((w) => w.name).join('、')}`);
     if (m.share.problem) lines.push(`- 取り組んでいる課題: ${m.share.problem}`);
     if (count || m.share.made) lines.push(`- 作ったもの: ${count}件${m.share.made ? `。${m.share.made}` : ''}`);
     if (m.outcome?.monthlySavedHours) lines.push(`- 減らした時間: 月 ${m.outcome.monthlySavedHours}時間`);

@@ -271,8 +271,22 @@ test('一覧: 取り組みの文字列は HTML エスケープし、works が無
 });
 
 test('TEAM.md: 了承した人の取り組みは名前だけを載せ、次の一歩を載せない', () => {
-  const a = { ...member('受講者A', 'n', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, works: [{ name: '証憑消込', phase: 2, state: 'active', next: '秘密の次', rounds: 1 }, { name: '休み中', phase: 1, state: 'paused', next: '', rounds: 0 }] };
+  const a = { ...member('受講者A', 'n', 1), share: shareOf({ works: true }), outcome: { made: [], monthlySavedHours: 0 }, works: [{ name: '証憑消込', phase: 2, state: 'active', next: '秘密の次', rounds: 1 }, { name: '休み中', phase: 1, state: 'paused', next: '', rounds: 0 }] };
   const md = renderTeamMd([a]);
   assert.ok(md.includes('- 進めていること: 証憑消込') && !md.includes('秘密の次') && !md.includes('休み中'));
   assert.ok(!renderTeamMd([{ ...a, share: shareOf({ share: false }) }]).includes('証憑消込'));
+});
+
+test('parseShare: works は true だけを了承として扱う', () => {
+  assert.equal(parseShare('{"share":true}').works, false);
+  assert.equal(parseShare('{"share":true,"works":true}').works, true);
+  assert.equal(parseShare('{"share":true,"works":"true"}').works, false);
+});
+
+test('TEAM.md: 取り組みの了承がなければ進めていることを載せない', () => {
+  const w = [{ name: '証憑消込', phase: 2, state: 'active', next: '秘密の次', rounds: 1 }];
+  const a = { ...member('受講者A', 'n', 1), works: w };
+  assert.ok(!renderTeamMd([{ ...a, share: shareOf() }]).includes('進めていること'));
+  assert.ok(!renderTeamMd([{ ...a, share: shareOf({ works: false }) }]).includes('進めていること'));
+  assert.ok(renderTeamMd([{ ...a, share: shareOf({ works: true }) }]).includes('- 進めていること: 証憑消込'));
 });
