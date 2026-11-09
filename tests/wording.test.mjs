@@ -5,7 +5,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const FILES = ['README.md', ...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => `course/stage-${n}.md`), 'course/stepups/index.md', 'course/rules.json', '.claude/skills/next/SKILL.md', '.claude/skills/challenge/SKILL.md', '.claude/skills/course-status/SKILL.md'];
+const FILES = ['README.md', ...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => `course/stage-${n}.md`), 'course/stepups/index.md', 'course/rules.json', '.claude/skills/next/SKILL.md', '.claude/skills/challenge/SKILL.md', '.claude/skills/course-status/SKILL.md', '.claude/skills/work/SKILL.md'];
 
 test('受講者に見える文に「段階」を使わない', () => {
   for (const f of FILES) assert.ok(!readFileSync(join(root, f), 'utf8').replaceAll('二段階', '').includes('段階'), f);
