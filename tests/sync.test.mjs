@@ -18,8 +18,8 @@ test('次の一歩は、いまの段階の最初の残り', () => {
   assert.equal(nextActionOf(result(5)), '公開先を書く');
 });
 
-test('全段階を終えた人には、発展コースかチームを案内する', () => {
-  assert.match(nextActionOf(result(null)), /発展コース/);
+test('全段階を終えた人には、フェーズの案内を返す', () => {
+  assert.match(nextActionOf(result(null)), /^フェーズ1と2を終えました/);
 });
 
 test('基本の段階を終えて課題解決が残っている人の次の一歩は /challenge', () => {

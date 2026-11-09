@@ -6,24 +6,16 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PHASES } from './activity.mjs';
 import { createCliEnv, evaluate, loadRules } from './check.mjs';
+import { nextActionOf } from './phases.mjs';
 
 export const PROGRESS_FILE = 'progress.json';
 export const AUTO_SUBJECT = 'コースの状態を保存';
 const COURSE_PATHS = ['course', 'scripts', '.claude/skills', '.claude/settings.json'];
-const CHALLENGE_STAGE = 7;
 const TEXT_LIMIT = 200;
 const MISSING_LIMIT = 20;
 const text = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, TEXT_LIMIT) : '');
 
-export function nextActionOf(result) {
-  if (result.currentStage === null) {
-    const challenge = result.stages.find((s) => s.id === CHALLENGE_STAGE);
-    if (challenge && !challenge.done) return '/challenge で次の課題に取り組む';
-    return '基本の段階を終えました。発展コースか「チームで作る」に進みます';
-  }
-  const stage = result.stages.find((s) => s.id === result.currentStage);
-  return stage?.missing[0] ?? '/next で次の一歩を確かめる';
-}
+export { nextActionOf } from './phases.mjs';
 
 export function buildProgress(result) {
   return {
