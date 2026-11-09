@@ -60,6 +60,11 @@ test('parseProgress: 知らない位置の名前は捨て、長い文は切り�
   assert.ok(parsed.stages[0].missing[0].length <= 200);
 });
 
+test('parseProgress: 新旧どちらの phase も受け付ける', () => {
+  assert.equal(parseProgress(JSON.stringify({ currentStage: 1, phase: '作ってみる', stages: [] }), [1]).phase, '作ってみる');
+  assert.equal(parseProgress(JSON.stringify({ currentStage: 1, phase: '慣れる', stages: [] }), [1]).phase, '慣れる');
+});
+
 test('applyProgress: 本人の判定で段階の状態を置き換える', () => {
   const merged = applyProgress(result(null), { currentStage: 5, phase: '試す', stages: [{ id: 5, done: false, missing: ['公開先を書く'] }] });
   assert.equal(merged.currentStage, 5);

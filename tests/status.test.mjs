@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { loadPhases, phaseOfStage } from '../scripts/phases.mjs';
 import { renderPage, selectInvitations, quietMembers, problemOf, loadMembers, parseShare, renderTeamMd, teamInviteTargets, selectTeamInvitation, shouldSyncTeam, collectStatuses, teamRemoveTargets } from '../scripts/status.mjs';
 
 const result = (currentStage, lastCommitDate = '2026-11-09T10:00:00+09:00') => ({
@@ -36,10 +37,15 @@ test('動きがない人の表示はページに含まれない', () => {
   assert.ok(!html.includes('声をかける'));
 });
 
-test('段階ごとの人数を示す', () => {
-  const html = renderPage([member('中村', 'nakamura', 1), member('鈴木', 'suzuki', 1), member('大東', 'ohigashi', 0)]);
-  assert.match(html, /課題の洗い出し[^<]*<\/td>\s*<td[^>]*>2人/);
-  assert.match(html, /環境づくり[^<]*<\/td>\s*<td[^>]*>1人/);
+test('フェーズごとの人数を示す', () => {
+  const html = renderPage([member('中村', 'nakamura', 1), member('鈴木', 'suzuki', 1), member('大東', 'ohigashi', null)]);
+  const P = loadPhases();
+  assert.match(html, new RegExp(`${phaseOfStage(1, P).title}[^<]*</td>\\s*<td[^>]*>2人`));
+  assert.match(html, new RegExp(`${phaseOfStage(null, P).title}[^<]*</td>\\s*<td[^>]*>1人`));
+  assert.ok(html.includes('フェーズごとの人数'));
+});
+test('一覧: 不明な段階の番号でも落とさず取得できませんでしたと出す', () => {
+  assert.ok(renderPage([member('中村', 'n', 999)]).includes('取得できませんでした'));
 });
 
 test('メンバーの招待だけを承諾の対象にする', () => {
@@ -172,11 +178,11 @@ test('TEAM.md: 活用日数はチームの合計だけで、個人別には出�
   assert.ok(!renderTeamMd([a, b]).includes('チーム合計 7日'));
 });
 
-test('TEAM.md: 本人が選んだ効いた使い方と、5段階の位置を載せる', () => {
+test('TEAM.md: 本人が選んだ効いた使い方と、いまのフェーズを載せる', () => {
   const a = { ...member('中村', 'n', 1), share: { ...shareOf(), tips: ['資料と台本を一緒に渡す'] }, phase: '試す', outcome: { made: [], monthlySavedHours: 0 } };
   const md = renderTeamMd([a]);
   assert.ok(md.includes('資料と台本を一緒に渡す'));
-  assert.ok(md.includes('いまの位置: 試す'));
+  assert.ok(md.includes(`- いまのフェーズ: ${phaseOfStage(1, loadPhases()).title}`));
 });
 
 test('parseShare: tips は文字列だけを5件まで', () => {
@@ -197,11 +203,18 @@ test('チームから外す対象: どちらもやめた人だけで、未回答
   assert.deepEqual(teamRemoveTargets(list, ['QUIT', 'keep', 'none', 'fail', 'owner'], 'owner').map((m) => m.github), ['quit']);
 });
 
-test('運営のページには活用日数を示す', () => {
-  const a = { ...member('中村', 'n', 1), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 4, monthDays: 9 }, phase: '試す' };
+test('運営のページ: 人別の活用日数と月別の推移を出さない', () => {
+  const a = { ...member('中村', 'n', 1), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 4, monthDays: 9 }, milestones: [{ key: 'stage:0', date: '2026-11-09' }], months: [{ month: '2026-11', days: 12 }] };
   const html = renderPage([a]);
-  assert.ok(html.includes('週 4日'));
-  assert.ok(html.includes('試す'));
+  assert.ok(!html.includes('週 4日') && !html.includes('今月 9日') && !html.includes('12日'));
+  assert.ok(html.includes('2026-11-09'));
+  assert.ok(html.includes('フェーズごとの人数'));
+});
+test('一覧: 古い版の受講者でも段階の番号から今のフェーズが出る', () => {
+  const a = { ...member('中村', 'n', 1), phase: '仕組みとして実装する', outcome: { made: [], monthlySavedHours: 0 } };
+  const html = renderPage([a]);
+  assert.ok(html.includes(phaseOfStage(1, loadPhases()).title));
+  assert.ok(!html.includes('仕組みとして実装する'));
 });
 
 test('チームから外すのは、両方を false と明示した人だけ', () => {
@@ -212,11 +225,11 @@ test('チームから外すのは、両方を false と明示した人だけ', (
   }
 });
 
-test('TEAM.md: 「継続される」は活用量が分かるので、チームには出さない', () => {
+test('TEAM.md: いまのフェーズを1行で示し、活用の位置を出さない', () => {
   const a = { ...member('中村', 'n', 1), share: shareOf(), phase: '継続される', outcome: { made: [], monthlySavedHours: 0 } };
   const md = renderTeamMd([a]);
-  assert.ok(!md.includes('継続される'));
-  assert.ok(md.includes('いまの位置: 仕組みとして実装する'));
+  assert.ok(md.includes(`- いまのフェーズ: ${phaseOfStage(1, loadPhases()).title}`));
+  assert.ok(!md.includes('継続される') && !md.includes('いまの段階'));
 });
 
 test('TEAM.md: 了承者の節目の日付を載せ、活用の推移は載せない', () => {
@@ -226,13 +239,6 @@ test('TEAM.md: 了承者の節目の日付を載せ、活用の推移は載せ�
   assert.ok(md.includes('2026-11-10') && md.includes('課題解決 レベル1'));
   assert.ok(!md.includes('継続される') && !md.includes('2026-11-11'));
   assert.ok(!md.includes('12日'));
-});
-
-test('運営のページ: 節目と月ごとの活用の推移を示す', () => {
-  const a = { ...member('中村', 'n', 1), outcome: { made: [], monthlySavedHours: 0 }, milestones: [{ key: 'stage:0', date: '2026-11-09' }], months: [{ month: '2026-11', days: 12 }] };
-  const html = renderPage([a]);
-  assert.ok(html.includes('2026-11-09'));
-  assert.ok(html.includes('2026-11: 12日'));
 });
 
 test('parseShare: 節目の掲載は明示の了承だけ', () => {

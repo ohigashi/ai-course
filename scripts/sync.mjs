@@ -4,9 +4,9 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { PHASES } from './activity.mjs';
+import { LEGACY_PHASES } from './activity.mjs';
 import { createCliEnv, evaluate, loadRules } from './check.mjs';
-import { nextActionOf } from './phases.mjs';
+import { loadPhases, nextActionOf } from './phases.mjs';
 
 export const PROGRESS_FILE = 'progress.json';
 export const AUTO_SUBJECT = 'コースの状態を保存';
@@ -40,7 +40,7 @@ export function parseProgress(raw, stageIds) {
   const stages = data.stages
     .filter((s) => s && stageIds.includes(s.id) && typeof s.done === 'boolean' && Array.isArray(s.missing))
     .map((s) => ({ id: s.id, done: s.done, missing: s.missing.map(text).filter(Boolean).slice(0, MISSING_LIMIT) }));
-  return { currentStage: data.currentStage, phase: PHASES.includes(data.phase) ? data.phase : null, stages };
+  return { currentStage: data.currentStage, phase: [...LEGACY_PHASES, ...loadPhases().map((p) => p.title)].includes(data.phase) ? data.phase : null, stages };
 }
 
 export function applyProgress(result, progress) {

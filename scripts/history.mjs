@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createCliEnv, evaluate, listFiles, loadRules, parseSavings, readRepoFile } from './check.mjs';
 import { levelProgress, loadCatalog, parseCompleted } from './challenge.mjs';
-import { isRealDate, parseActivity, PHASES, todayString } from './activity.mjs';
+import { isRealDate, parseActivity, LEGACY_PHASES, todayString } from './activity.mjs';
 import { loadRoadmap } from './roadmap.mjs';
 
 const MILESTONES_FILE = 'milestones.json';
@@ -12,7 +12,7 @@ const HIDDEN_FROM_TEAM = 'phase:継続される';
 
 const MAX_EVENTS = 200;
 const isValidKey = (key) => typeof key === 'string'
-  && (/^(stage|level):\d{1,3}$/.test(key) || (key.startsWith('phase:') && PHASES.includes(key.slice('phase:'.length))));
+  && (/^(stage|level):\d{1,3}$/.test(key) || (key.startsWith('phase:') && LEGACY_PHASES.includes(key.slice('phase:'.length))));
 
 // 他の人にも見える一覧に載るので、決まった形の節目だけを受け付ける。
 export function parseMilestones(text) {
