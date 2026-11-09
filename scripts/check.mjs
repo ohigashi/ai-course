@@ -97,6 +97,8 @@ function checkUrl(repoDir, check, env) {
   const url = text === null ? null : urlOf(text);
   if (!url) return [check.label];
   if (!env.http) return [];
+  // 社内向けの公開先(非公開の Slack など)には外から届かないので、本人の申告を信じる
+  if (text.split('\n').find((line) => line.includes(url))?.includes('社内')) return [];
   const statuses = [...(env.http(url) ?? '').matchAll(/HTTP\/[\d.]+ (\d{3})/g)];
   const last = statuses.at(-1)?.[1];
   return last && /^[23]/.test(last) ? [] : [`${check.label}(URL に届きません)`];

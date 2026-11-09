@@ -236,6 +236,24 @@ test('url: URL が必要で、http が使えるときは応答も確かめ、使
   assert.equal(evaluate(dir, rules, { ...noRemote, http: () => null }).stages[0].done, false);
 });
 
+test('url: URL と同じ行に「社内」とあれば、外から届くかを確かめない', () => {
+  const rules = [stage(5, [{ type: 'url', path: 'u.md', label: '公開URLを書く' }])];
+  const unreachable = { ...noRemote, http: () => { throw new Error('社内の公開先に通信した'); } };
+  const internal = repo({ 'u.md': '公開先: https://example.slack.com/archives/C1 (社内の Slack)\n' });
+  assert.equal(evaluate(internal, rules, unreachable).stages[0].done, true);
+});
+
+test('url: 「社内」が URL と別の行にあるときは、これまでどおり外から届くかを確かめる', () => {
+  const rules = [stage(5, [{ type: 'url', path: 'u.md', label: '公開URLを書く' }])];
+  const dir = repo({ 'u.md': '公開先: https://example.com/app\n\n社内の人に見てもらった\n' });
+  assert.equal(evaluate(dir, rules, { ...noRemote, http: () => 'HTTP/2 404\n' }).stages[0].done, false);
+});
+
+test('url: 「社内」と書いてあっても URL がなければ未完了', () => {
+  const rules = [stage(5, [{ type: 'url', path: 'u.md', label: '公開URLを書く' }])];
+  assert.equal(evaluate(repo({ 'u.md': '公開先: 社内の Slack\n' }), rules, { ...noRemote, http: () => 'HTTP/2 200\n' }).stages[0].done, false);
+});
+
 test('updateReminderText: 更新があれば案内し、無ければ空', () => {
   assert.ok(updateReminderText('更新があります(版: abc)\nM\tcourse/stage-2.md\n').includes('/next'));
   assert.equal(updateReminderText('コースは最新です。\n'), '');
