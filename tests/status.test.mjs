@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadPhases, phaseOfStage } from '../scripts/phases.mjs';
@@ -321,4 +321,16 @@ test('dataTargets: 開始前(result なし)の人は書かないが、消しも�
 });
 test('dataTargets: failed なら result があっても書かない', () => {
   assert.deepEqual(dataTargets([{ github: 'a', failed: true, result: {} }], ['a.json']), { write: [], remove: [] });
+});
+
+test('CLI: syncData は syncTeam と別の try で動き、失敗の理由を出し、運営者の判定の内側にある', () => {
+  const src = readFileSync(new URL('../scripts/status.mjs', import.meta.url), 'utf8');
+  const cli = src.slice(src.indexOf('if (process.argv[1]'));
+  const guard = cli.indexOf('shouldSyncTeam(');
+  const team = cli.indexOf('syncTeam(statuses');
+  const data = cli.indexOf('syncData(statuses');
+  assert.ok(guard > 0 && team > guard && data > team);
+  const between = cli.slice(team, data);
+  assert.match(between, /catch \(e\)/, 'syncTeam is wrapped in its own try/catch before syncData');
+  assert.match(cli.slice(data), /^[^]*?catch \(e\) \{\s*console\.log\([^)]*e\.message/);
 });

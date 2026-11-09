@@ -364,17 +364,21 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     try {
       const config = loadConfig();
       if (shouldSyncTeam(members, gh('api', 'user', '--jq', '.login').trim(), config.operatorGithub)) {
-        syncTeam(statuses, config.teamRepo, config.operatorGithub, workDir);
+        try {
+          syncTeam(statuses, config.teamRepo, config.operatorGithub, workDir);
+        } catch (e) {
+          console.log(`チームのリポジトリを更新できませんでした。(${e.message})`);
+        }
         if (config.dataRepo) {
           try {
             syncData(statuses, config.dataRepo, workDir, new Date().toISOString());
-          } catch {
-            console.log('表示用データを更新できませんでした。');
+          } catch (e) {
+            console.log(`表示用データを更新できませんでした。(${e.message})`);
           }
         }
       }
-    } catch {
-      console.log('チームのリポジトリを更新できませんでした。');
+    } catch (e) {
+      console.log(`チームのリポジトリを更新できませんでした。(${e.message})`);
     }
     const quiet = quietMembers(statuses);
     if (quiet.length) console.log(`2週間以上更新がない人(声をかける候補): ${quiet.map((m) => m.name).join('、')}`);
