@@ -63,3 +63,17 @@ test('発展コースに時期の条件の列がない', () => {
 test('changelog の先頭は複数の取り組みの項目', () => {
   assert.ok(read('course/changelog.md').split('\n').find((l) => l.startsWith('## ')).includes('複数の取り組みを進められるようになりました'));
 });
+
+test('課題の洗い出しを終えることを条件にする文がない', () => {
+  for (const f of [...FILES, '.claude/skills/team/SKILL.md', '.claude/skills/log/SKILL.md']) {
+    const t = read(f);
+    for (const bad of ['課題の洗い出し」を終えたら', '課題の洗い出し」を終えた受講者', '課題の洗い出しを終え']) assert.ok(!t.includes(bad), `${f}: ${bad}`);
+  }
+});
+
+test('/next: 取り組みの場所、redo の提案、月1回の確認、共有の注意を書く', () => {
+  const t = read('.claude/skills/next/SKILL.md');
+  for (const key of ['works/<slug>/', 'work.mjs move', '`redo`', 'events.mjs add asked', 'events.mjs add running', '顧客名', '`works.json` が新しく作られる']) assert.ok(t.includes(key), key);
+  assert.ok(read('.claude/skills/work/SKILL.md').includes('works/<slug>/'));
+  assert.ok(read('.claude/skills/log/SKILL.md').includes('events.mjs add delegated'));
+});
