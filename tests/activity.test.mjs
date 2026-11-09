@@ -44,3 +44,11 @@ test('一度「継続される」に達したら、活用が減っても位置�
   assert.equal(phaseOf(r(4), past, 0), '継続される');
   assert.equal(activitySummary(['2026-08-03', '2026-10-10'], now).everContinued, false);
 });
+
+test('parseActivity: 重複と実在しない日付を除き、件数に上限を設ける', () => {
+  assert.deepEqual(parseActivity('{"days":["2026-11-01","2026-11-01","2026-11-99","2026-02-30"]}'), ['2026-11-01']);
+  const many = Array.from({ length: 5000 }, (_, i) => new Date(Date.UTC(2010, 0, 1 + i)).toISOString().slice(0, 10));
+  const parsed = parseActivity(JSON.stringify({ days: many }));
+  assert.equal(parsed.length, 3660);
+  assert.equal(parsed.at(-1), many.at(-1));
+});

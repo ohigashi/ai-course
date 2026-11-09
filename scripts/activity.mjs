@@ -3,17 +3,22 @@ export const PHASES = ['学ぶ', '試す', '慣れる', '仕組みとして実�
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEKS_FOR_CONTINUING = 3;
+const MAX_DAYS = 3660;
 const pad = (n) => String(n).padStart(2, '0');
 
 export const todayString = (now = new Date()) => `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
 export const recordDay = (days, today) => [...new Set([...days, today])].sort();
 
+const isRealDate = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)
+  && !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().startsWith(d);
+
 export function parseActivity(text) {
   if (text === null) return [];
   try {
     const days = JSON.parse(text)?.days;
-    return Array.isArray(days) ? days.filter((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) : [];
+    if (!Array.isArray(days)) return [];
+    return [...new Set(days.filter(isRealDate))].sort().slice(-MAX_DAYS);
   } catch {
     return [];
   }
