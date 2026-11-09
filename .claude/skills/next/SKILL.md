@@ -11,6 +11,7 @@ description: コースのいまの段階と、次にやることを受講者に�
 
 1. `node scripts/update-course.mjs` を実行する。「更新があります」と表示されたら、変更されるファイルを受講者に伝え、`git show <版>:course/changelog.md` を読んで手元の `course/changelog.md` に無い項目を受講者に伝え、受講者の `CLAUDE.md` や `docs/` に照らして、その人の仕事で使える場面を1文で添える。了承を得てから表示された版で `node scripts/update-course.mjs --apply=<版>` を実行する。適用のあとにもう一度確認し、更新が残っていれば同じ手順で適用する。了承がなければ手元の版で続ける
 2. `node scripts/check.mjs` を実行し、JSON の結果を読む。段階の完了と未完了は、この結果だけで決める。自分の判断で完了にしない
+   判定のあとに `node scripts/sync.mjs` を実行する。判定と次の一歩、取り込み済みのコースの更新だけを自動で GitHub に保存するもので、受講者への確認は要らない。受講者の作業は保存しない
 3. `node scripts/history.mjs` を実行して、これまでの歩みを更新する。`milestones.json` が変わったら、`git add milestones.json` のあと `git commit -m "歩みの更新" -- milestones.json` を実行して push する。受講者が歩みを見たいときは出力を見せる
    続けて `currentStage` の教材 `course/stage-<番号>.md`、`CLAUDE.md`、`docs/` の作成中のファイルを読む
 4. 次の順で、短く返す
@@ -20,7 +21,7 @@ description: コースのいまの段階と、次にやることを受講者に�
    - 次にやること(1つだけ)
    - 受講者の内容に合わせた助言
    - 段階を完了していれば、次の段階の案内
-5. `currentStage` が null のときは、基本の段階をすべて終えたことを伝え、発展コースと「チームで作る」を案内する
+5. `currentStage` が null のときは、基本の段階をすべて終えたことを伝える。課題解決のレベルが残っていれば、次にやることは `/challenge` の次の課題の1つにする。終わるたびに次の課題へ進むよう案内する。発展コースと「チームで作る」は、そのあとに添える
 6. 結果の `unsaved` が true なら、案内の最後に「まだ GitHub に保存していない作業があります。commit して push しましょう」と添え、了承を得て実行する。`git add` は `CLAUDE.md`、`docs/`、`work/`、`app/` に限る。`challenges/` と `.local/` は含めない
 
 ## ファイルと発展コース

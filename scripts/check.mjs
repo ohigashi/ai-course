@@ -8,7 +8,7 @@ import { activitySummary, parseActivity, phaseOf } from './activity.mjs';
 import { levelProgress, loadCatalog, parseCompleted } from './challenge.mjs';
 
 const TEMPLATE_MARK = '<!-- template -->';
-const COURSE_PATHS = ['course/', 'scripts/', '.claude/', '.local/'];
+const COURSE_PATHS = ['course/', 'scripts/', '.claude/', '.local/', 'progress.json'];
 const TIME_PATTERN = /\d+\s*(分|時間|h\b|min)|半日|[一二三四五六七八九十]+\s*(分|時間)/i;
 
 // 他の人のリポジトリも読むので、シンボリックリンクでリポジトリの外を読まない。
@@ -186,7 +186,7 @@ export function claudeMdStatus(repoDir, env, now = new Date()) {
   const last = env.git(['log', '-1', '--format=%H %cI', '--', 'CLAUDE.md'])?.trim();
   if (!last) return { due: false };
   const [sha, date] = last.split(' ');
-  const count = env.git(['rev-list', '--count', `${sha}..HEAD`, '--', '.', ':!course', ':!scripts', ':!.claude', ':!activity.json', ':!milestones.json', ':!challenges.json']);
+  const count = env.git(['rev-list', '--count', `${sha}..HEAD`, '--', '.', ':!course', ':!scripts', ':!.claude', ':!activity.json', ':!milestones.json', ':!progress.json', ':!challenges.json']);
   const commitsSince = Number(count) || 0;
   const daysSince = Math.floor((now - new Date(date)) / DAY_MS);
   const due = (daysSince >= REVIEW_AFTER_DAYS && commitsSince >= 1) || commitsSince >= REVIEW_AFTER_COMMITS;

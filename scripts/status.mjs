@@ -8,6 +8,7 @@ import { parseMilestones, parseSnapshots, monthlyActivity, renderTimeline, teamM
 import { loadRoadmap } from './roadmap.mjs';
 import { parseActivity } from './activity.mjs';
 import { evaluate, createEnv, loadRules, loadConfig, sections, readRepoFile, listFiles, parseSavings, urlOf } from './check.mjs';
+import { AUTO_SUBJECT, PROGRESS_FILE, applyProgress, nextActionOf, parseProgress } from './sync.mjs';
 
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -112,6 +113,34 @@ const remaining = (member) => {
   return stage ? stage.missing : [];
 };
 
+export function nextStepOf(member) {
+  if (!member.result) return '-';
+  return member.courseBehind ? 'コースの更新を /next で取り込む' : nextActionOf(member.result);
+}
+
+const RECENT_LIMIT = 3;
+const AUTOMATIC_SUBJECTS = new Set([AUTO_SUBJECT, '歩みの更新']);
+
+// commit の件名を「日時<TAB>件名」の行から読む。自動の保存は動きに数えない。
+export function recentMoves(log) {
+  return log.split('\n').map((line) => {
+    const tab = line.indexOf('\t');
+    return tab < 0 ? null : { date: line.slice(0, tab), subject: line.slice(tab + 1).slice(0, 120) };
+  }).filter((m) => m && !AUTOMATIC_SUBJECTS.has(m.subject)).slice(0, RECENT_LIMIT);
+}
+
+function stateNotes(member) {
+  return [member.courseBehind ? '更新待ち' : '', member.synced === false ? '未同期(運営側の判定)' : ''].filter(Boolean);
+}
+
+const shortDate = (iso) => String(iso).slice(0, 16).replace('T', ' ');
+
+function movesCell(member) {
+  const last = member.result?.lastCommitDate ? [escapeHtml(shortDate(member.result.lastCommitDate))] : [];
+  const moves = (member.recent ?? []).map((m) => `${escapeHtml(shortDate(m.date))} ${escapeHtml(m.subject)}`);
+  return [...last, ...moves].join('<br>') || '-';
+}
+
 function outcomeCell(member) {
   const o = member.outcome;
   if (!o) return '-';
@@ -138,12 +167,13 @@ export function renderPage(members) {
   const summary = [...counts].map(([label, n]) => `<tr><td>${escapeHtml(label)}</td><td class="n">${n}人</td></tr>`).join('');
   const rows = sorted.map((m) => `<tr>
 <td>${escapeHtml(m.name)}</td>
-<td>${m.phase ? `${escapeHtml(m.phase)}<br>` : ''}${escapeHtml(currentLabel(m))}${m.activity ? `<br>週 ${m.activity.weekDays}日・今月 ${m.activity.monthDays}日` : ''}</td>
+<td>${m.phase ? `${escapeHtml(m.phase)}<br>` : ''}${escapeHtml(currentLabel(m))}${m.activity ? `<br>週 ${m.activity.weekDays}日・今月 ${m.activity.monthDays}日` : ''}${stateNotes(m).map((n) => `<br>${escapeHtml(n)}`).join('')}</td>
+<td>${escapeHtml(nextStepOf(m))}</td>
 <td>${remaining(m).map(escapeHtml).join('<br>') || '-'}</td>
 <td>${m.problem ? escapeHtml(m.problem) : '-'}</td>
 <td>${outcomeCell(m)}</td>
 <td>${journeyCell(m)}</td>
-<td class="d">${m.result?.lastCommitDate ? escapeHtml(m.result.lastCommitDate.slice(0, 10)) : '-'}</td>
+<td class="d">${movesCell(m)}</td>
 </tr>`).join('\n');
   return `<!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
@@ -160,7 +190,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:8px 12px 8px 0;border-bo
 <h2>減らした時間の月合計</h2>
 <p>${totalHours}時間(本人の記録による)</p>
 <h2>メンバー</h2>
-<table><thead><tr><th>名前</th><th>いまの段階</th><th>残っていること</th><th>選んだ課題</th><th>成果</th><th>これまでの歩み</th><th>最終更新</th></tr></thead>
+<table><thead><tr><th>名前</th><th>いまの段階</th><th>次の一歩</th><th>残っていること</th><th>選んだ課題</th><th>成果</th><th>これまでの歩み</th><th>最近の動き</th></tr></thead>
 <tbody>
 ${rows}
 </tbody></table>
@@ -183,12 +213,18 @@ function courseRepos() {
     .split('\n').filter(Boolean).map((line) => JSON.parse(line)).filter((r) => r.topics?.includes('ai-course'));
 }
 
+const changelogOf = (dir) => readRepoFile(dir, 'course/changelog.md')?.replace(/\r\n?/g, '\n') ?? null;
+
 function memberStatus(member, repos, rules, workDir) {
   const repo = repos.find((r) => r.owner.toLowerCase() === member.github.toLowerCase());
   if (!repo) return { ...member, repo: null, result: null, problem: null };
   const dir = join(workDir, member.github);
   gh('repo', 'clone', repo.full_name, dir, '--', '--quiet');
-  const result = evaluate(dir, rules, createEnv(dir, { assumeInvited: true }));
+  // 本人の手元の判定を正とする。まだ同期していない人だけ、運営側の判定を使う。
+  const progress = parseProgress(readRepoFile(dir, PROGRESS_FILE), rules.map((r) => r.id));
+  const result = applyProgress(evaluate(dir, rules, createEnv(dir, { assumeInvited: true })), progress);
+  const courseBehind = changelogOf(dir) !== changelogOf(dirname(dirname(fileURLToPath(import.meta.url))));
+  const recent = recentMoves(git(dir, 'log', '-20', '--format=%cI%x09%s'));
   const text = readRepoFile(dir, 'docs/01-problem.md');
   const problem = text === null ? null : problemOf(text);
   const log = readRepoFile(dir, 'docs/02-log.md');
@@ -199,7 +235,7 @@ function memberStatus(member, repos, rules, workDir) {
     url: launch === null ? null : urlOf(launch),
     stepups: listFiles(dir, 'docs/stepups').length,
   };
-  return { ...member, repo: repo.full_name, result, problem, outcome, share: parseShare(readRepoFile(dir, 'team-share.json')), activity: result.activity, phase: result.phase, milestones: parseMilestones(readRepoFile(dir, 'milestones.json')), months: monthlyActivity(parseActivity(readRepoFile(dir, 'activity.json'))), snapshots: parseSnapshots(readRepoFile(dir, 'milestones.json')) };
+  return { ...member, repo: repo.full_name, result, problem, outcome, synced: progress !== null, courseBehind, recent, share: parseShare(readRepoFile(dir, 'team-share.json')), activity: result.activity, phase: result.phase, milestones: parseMilestones(readRepoFile(dir, 'milestones.json')), months: monthlyActivity(parseActivity(readRepoFile(dir, 'activity.json'))), snapshots: parseSnapshots(readRepoFile(dir, 'milestones.json')) };
 }
 
 export function shouldSyncTeam(members, login, operator) {

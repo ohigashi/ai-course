@@ -14,3 +14,11 @@ try {
 } catch {
   // 案内は補助なので、何も表示せずに終える
 }
+
+try {
+  const repoDir = dirname(dirname(fileURLToPath(import.meta.url)));
+  const output = execFileSync(process.execPath, [join(repoDir, 'scripts', 'sync.mjs')], { cwd: repoDir, encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
+  if (output) console.log(output.trim());
+} catch {
+  // 同期は補助なので、作業を止めない
+}
