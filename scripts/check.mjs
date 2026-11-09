@@ -284,5 +284,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const repoDir = dirname(dirname(fileURLToPath(import.meta.url)));
   const env = createCliEnv(repoDir, { assumeInvited: process.argv.includes('--assume-invited') });
   const result = evaluate(repoDir, loadRules(), env);
-  process.stdout.write(`${JSON.stringify({ ...result, roadmap: renderRoadmap(result, loadPhases()) }, null, 2)}\n`);
+  const team = readRepoFile(repoDir, 'docs/06-team.md');
+  const extras = {
+    stepups: listFiles(repoDir, 'docs/stepups').length,
+    levelsDone: levelProgress(parseCompleted(readRepoFile(repoDir, 'challenges.json')), loadCatalog()).completedLevels.length,
+    challengeStarted: readRepoFile(repoDir, 'challenges.json') !== null,
+    teamStarted: team !== null && !team.includes(TEMPLATE_MARK),
+  };
+  process.stdout.write(`${JSON.stringify({ ...result, roadmap: renderRoadmap(result, loadPhases(), extras) }, null, 2)}\n`);
 }

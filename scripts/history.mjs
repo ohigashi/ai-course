@@ -6,7 +6,8 @@ import { createCliEnv, evaluate, listFiles, loadRules, parseSavings, readRepoFil
 import { levelProgress, loadCatalog, parseCompleted } from './challenge.mjs';
 import { isRealDate, parseActivity, LEGACY_PHASES, todayString } from './activity.mjs';
 import { loadRoadmap } from './roadmap.mjs';
-import { loadPhases, phaseMarks } from './phases.mjs';
+import { loadPhases } from './phases.mjs';
+import { roundCount } from './works.mjs';
 import { loadMechanisms, parseMechanismLog } from './mechanism.mjs';
 
 const MILESTONES_FILE = 'milestones.json';
@@ -77,7 +78,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const stagesDone = result.stages.filter((s) => s.done && s.id !== 7).map((s) => s.id);
   const current = read(MILESTONES_FILE);
   const phases = loadPhases();
-  const phasesDone = phaseMarks(result, phases).filter((p) => p.mark === '済').map((p) => p.id);
+  const phasesDone = phases.filter((p) => result.works.some((work) => roundCount(work, p.id) >= 1)).map((p) => p.id);
   const events = syncMilestones(parseMilestones(current), { stagesDone, phasesDone, levels }, todayString());
   const log = readRepoFile(repoDir, 'docs/02-log.md');
   const made = listFiles(repoDir, 'work').length + listFiles(repoDir, 'app').length;

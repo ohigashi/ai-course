@@ -33,14 +33,12 @@
     "id": 6,
     "title": "チームで作る",
     "goal": "仲間と共同でプロジェクトを進める",
-    "optional": true,
-    "availableAfter": 2
+    "optional": true
   },
   {
     "id": 7,
     "title": "課題解決とプロダクト",
     "goal": "他の人の課題を考えて仕組みにする経験を積み重ねる",
-    "optional": true,
-    "availableAfter": 2
+    "optional": true
   }
 ]
