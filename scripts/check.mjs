@@ -5,6 +5,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const TEMPLATE_MARK = '<!-- template -->';
+const COURSE_PATHS = ['course/', 'scripts/', '.claude/'];
 
 function readDoc(repoDir, path) {
   const full = join(repoDir, path);
@@ -53,7 +54,9 @@ function checkTimedItems(repoDir, check) {
 function checkPushed(env, check) {
   if (env.git(['rev-parse', '@{u}']) === null) return [check.label];
   const status = env.git(['status', '--porcelain=v2', '--branch']) ?? '';
-  return /branch\.ab \+0 -0/.test(status) ? [] : [check.label];
+  const uncommitted = status.split('\n').filter((line) => /^[12?u] /.test(line)).map((line) => line.split(' ').pop());
+  const ownChanges = uncommitted.filter((path) => !COURSE_PATHS.some((p) => path.startsWith(p)));
+  return /branch\.ab \+0 -0/.test(status) && ownChanges.length === 0 ? [] : [check.label];
 }
 
 function repoSlug(env) {

@@ -121,3 +121,14 @@ test('lastCommitDate は git の結果を返し、無ければ null', () => {
   const git = (args) => (args[0] === 'log' ? '2026-11-09T10:00:00+09:00\n' : null);
   assert.equal(evaluate(repo({}), [], { git, gh: () => null }).lastCommitDate, '2026-11-09T10:00:00+09:00');
 });
+
+test('pushed: 書いた内容が未 commit なら未完了、教材の更新だけなら完了', () => {
+  const rules = [stage(0, [{ type: 'pushed', label: 'push する' }])];
+  const withStatus = (extra) => ({
+    git: (args) => (args[0] === 'rev-parse' ? 'abc' : args[0] === 'status' ? `# branch.ab +0 -0\n${extra}` : null),
+    gh: () => null,
+  });
+  assert.equal(evaluate(repo({}), rules, withStatus('1 .M N... 100644 100644 100644 a b CLAUDE.md\n')).stages[0].done, false);
+  assert.equal(evaluate(repo({}), rules, withStatus('? docs/memo.md\n')).stages[0].done, false);
+  assert.equal(evaluate(repo({}), rules, withStatus('1 M. N... 100644 100644 100644 a b course/stage-0.md\n1 M. N... 100644 100644 100644 a b .claude/skills/next/SKILL.md\n')).stages[0].done, true);
+});
