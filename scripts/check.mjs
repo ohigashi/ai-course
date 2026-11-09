@@ -4,6 +4,7 @@ import { readFileSync, existsSync, lstatSync, realpathSync, readdirSync } from '
 import { join, dirname, relative, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadRoadmap, renderRoadmap } from './roadmap.mjs';
+import { activitySummary, parseActivity, phaseOf } from './activity.mjs';
 
 const TEMPLATE_MARK = '<!-- template -->';
 const COURSE_PATHS = ['course/', 'scripts/', '.claude/'];
@@ -204,7 +205,10 @@ export function evaluate(repoDir, rules, env) {
   });
   const current = stages.find((s) => !s.done && !s.optional);
   const lastCommitDate = env.git(['log', '-1', '--format=%cI'])?.trim() || null;
-  return { stages, currentStage: current ? current.id : null, lastCommitDate, unsaved: hasUnsavedWork(env), claudeMd: claudeMdStatus(repoDir, env) };
+  const currentStage = current ? current.id : null;
+  const activity = activitySummary(parseActivity(readRepoFile(repoDir, 'activity.json')));
+  const phase = phaseOf({ currentStage }, activity, listFiles(repoDir, 'docs/stepups').length);
+  return { stages, currentStage, lastCommitDate, unsaved: hasUnsavedWork(env), claudeMd: claudeMdStatus(repoDir, env), activity, phase };
 }
 
 function run(cmd, args, cwd) {

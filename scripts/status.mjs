@@ -42,12 +42,20 @@ export function parseShare(text) {
     return null;
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
-  return { share: data.share === true, project: data.project === true, problem: shareText(data.problem), made: shareText(data.made) };
+  const tips = Array.isArray(data.tips) ? data.tips.filter((t) => typeof t === 'string').map(shareText).filter(Boolean).slice(0, 5) : [];
+  return { share: data.share === true, project: data.project === true, problem: shareText(data.problem), made: shareText(data.made), tips };
 }
 
 export function teamInviteTargets(members, collaborators) {
   const joined = new Set(collaborators.map((c) => c.toLowerCase()));
   return members.filter((m) => (m.share?.share || m.share?.project) && !joined.has(m.github.toLowerCase()));
+}
+
+// 共有も参加もやめたと本人が記録した人だけを外す。未回答や取得の失敗では外さない。
+export function teamRemoveTargets(members, collaborators, operator) {
+  const joined = new Set(collaborators.map((c) => c.toLowerCase()));
+  return members.filter((m) => m.share && !m.share.share && !m.share.project
+    && joined.has(m.github.toLowerCase()) && m.github.toLowerCase() !== operator.toLowerCase());
 }
 
 export const selectTeamInvitation = (invitations, teamRepo) =>
@@ -58,22 +66,28 @@ export function renderTeamMd(members) {
   const counts = new Map();
   for (const m of shared) counts.set(currentLabel(m), (counts.get(currentLabel(m)) ?? 0) + 1);
   const total = Math.round(shared.reduce((sum, m) => sum + (m.outcome?.monthlySavedHours ?? 0), 0) * 10) / 10;
+  const weekTotal = shared.reduce((sum, m) => sum + (m.activity?.weekDays ?? 0), 0);
   const lines = [
     '# チームの進捗と成果', '',
     'このファイルは自動で作られます。手で編集しません。載っているのは、本人が了承した内容だけです。', '',
     '## 全体', '',
     ...[...counts].map(([label, n]) => `- ${label}: ${n}人`),
-    `- 減らした時間の月合計: ${total}時間(本人の記録による)`, '',
+    `- 減らした時間の月合計: ${total}時間(本人の記録による)`,
+    `- 今週の活用: チーム合計 ${weekTotal}日`, '',
     '## メンバー', '',
   ];
   for (const m of shared) {
     const count = m.outcome?.made?.length ?? 0;
-    lines.push(`### ${m.name}`, '', `- いまの段階: ${currentLabel(m)}`);
+    lines.push(`### ${m.name}`, '');
+    if (m.phase) lines.push(`- いまの位置: ${m.phase}`);
+    lines.push(`- いまの段階: ${currentLabel(m)}`);
     if (m.share.problem) lines.push(`- 取り組んでいる課題: ${m.share.problem}`);
     if (count || m.share.made) lines.push(`- 作ったもの: ${count}件${m.share.made ? `。${m.share.made}` : ''}`);
     if (m.outcome?.monthlySavedHours) lines.push(`- 減らした時間: 月 ${m.outcome.monthlySavedHours}時間`);
     lines.push('');
   }
+  const tips = shared.flatMap((m) => (m.share.tips ?? []).map((tip) => `- ${tip}(${m.name})`));
+  if (tips.length) lines.push('## 効いた使い方', '', ...tips, '');
   return `${lines.join('\n').trimEnd()}\n`;
 }
 
@@ -109,7 +123,7 @@ export function renderPage(members) {
   const summary = [...counts].map(([label, n]) => `<tr><td>${escapeHtml(label)}</td><td class="n">${n}人</td></tr>`).join('');
   const rows = sorted.map((m) => `<tr>
 <td>${escapeHtml(m.name)}</td>
-<td>${escapeHtml(currentLabel(m))}</td>
+<td>${m.phase ? `${escapeHtml(m.phase)}<br>` : ''}${escapeHtml(currentLabel(m))}${m.activity ? `<br>週 ${m.activity.weekDays}日・今月 ${m.activity.monthDays}日` : ''}</td>
 <td>${remaining(m).map(escapeHtml).join('<br>') || '-'}</td>
 <td>${m.problem ? escapeHtml(m.problem) : '-'}</td>
 <td>${outcomeCell(m)}</td>
@@ -169,7 +183,7 @@ function memberStatus(member, repos, rules, workDir) {
     url: launch === null ? null : urlOf(launch),
     stepups: listFiles(dir, 'docs/stepups').length,
   };
-  return { ...member, repo: repo.full_name, result, problem, outcome, share: parseShare(readRepoFile(dir, 'team-share.json')) };
+  return { ...member, repo: repo.full_name, result, problem, outcome, share: parseShare(readRepoFile(dir, 'team-share.json')), activity: result.activity, phase: result.phase };
 }
 
 export function shouldSyncTeam(members, login, operator) {
@@ -191,7 +205,7 @@ export function collectStatuses(members, read) {
 const git = (dir, ...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
 // 了承した人を招待し、TEAM.md をチームのリポジトリへ反映する。
-function syncTeam(statuses, teamRepo, workDir) {
+function syncTeam(statuses, teamRepo, operator, workDir) {
   const collaborators = JSON.parse(gh('api', `repos/${teamRepo}/collaborators`)).map((c) => c.login);
   for (const member of teamInviteTargets(statuses, collaborators)) {
     try {
@@ -199,6 +213,14 @@ function syncTeam(statuses, teamRepo, workDir) {
       console.log(`チームのリポジトリに招待しました: ${member.name}`);
     } catch {
       console.log(`チームのリポジトリに招待できませんでした: ${member.name}`);
+    }
+  }
+  for (const member of teamRemoveTargets(statuses, collaborators, operator)) {
+    try {
+      gh('api', '--method', 'DELETE', `repos/${teamRepo}/collaborators/${member.github}`);
+      console.log(`チームのリポジトリから外しました: ${member.name}`);
+    } catch {
+      console.log(`チームのリポジトリから外せませんでした: ${member.name}`);
     }
   }
   const dir = join(workDir, '_team');
@@ -230,7 +252,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     try {
       const config = loadConfig();
       if (shouldSyncTeam(members, gh('api', 'user', '--jq', '.login').trim(), config.operatorGithub)) {
-        syncTeam(statuses, config.teamRepo, workDir);
+        syncTeam(statuses, config.teamRepo, config.operatorGithub, workDir);
       }
     } catch {
       console.log('チームのリポジトリを更新できませんでした。');

@@ -133,3 +133,18 @@ test('受講者が自分で作ったスキルがあっても、更新の案内�
   assert.ok(r.stdout.includes('最新です'));
   assert.ok(!r.stdout.includes('my-skill'));
 });
+
+test('log.mjs: 日付だけを activity.json に残し、.local は GitHub に上がらない', () => {
+  const { learner } = setup();
+  write(learner, '.local/log.md', '- 顧客の話');
+  const log = join(root, 'scripts', 'log.mjs');
+  assert.equal(spawnSync(process.execPath, [log], { cwd: learner, encoding: 'utf8' }).status, 0);
+  assert.equal(spawnSync(process.execPath, [log], { cwd: learner, encoding: 'utf8' }).status, 0);
+  const days = JSON.parse(readFileSync(join(learner, 'activity.json'), 'utf8')).days;
+  assert.equal(days.length, 1);
+  assert.match(days[0], /^\d{4}-\d{2}-\d{2}$/);
+  const status = git(learner, 'status', '--porcelain');
+  assert.ok(status.includes('activity.json'));
+  assert.ok(!status.includes('.local'));
+  assert.equal(readFileSync(join(learner, '.git/info/exclude'), 'utf8').split('\n').filter((l) => l === '.local/').length, 1);
+});

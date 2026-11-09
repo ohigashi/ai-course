@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { renderPage, selectInvitations, quietMembers, problemOf, loadMembers, parseShare, renderTeamMd, teamInviteTargets, selectTeamInvitation, shouldSyncTeam, collectStatuses } from '../scripts/status.mjs';
+import { renderPage, selectInvitations, quietMembers, problemOf, loadMembers, parseShare, renderTeamMd, teamInviteTargets, selectTeamInvitation, shouldSyncTeam, collectStatuses, teamRemoveTargets } from '../scripts/status.mjs';
 
 const result = (currentStage, lastCommitDate = '2026-11-09T10:00:00+09:00') => ({
   stages: [
@@ -159,4 +159,45 @@ test('1人の取得に失敗しても他の人を集計し、失敗した人は�
   assert.ok(renderTeamMd(list).includes('### B'));
   assert.ok(!renderTeamMd(list).includes('### A'));
   assert.ok(renderPage(list).includes('A'));
+});
+
+test('TEAM.md: 活用日数はチームの合計だけで、個人別には出さない', () => {
+  const a = { ...member('中村', 'n', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 4 } };
+  const b = { ...member('鈴木', 's', 1), share: shareOf(), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 3 } };
+  const c = { ...member('非共有', 'x', 1), share: shareOf({ share: false }), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 5 } };
+  const md = renderTeamMd([a, b, c]);
+  assert.ok(md.includes('今週の活用: チーム合計 7日'));
+  assert.ok(!md.includes('4日') && !md.includes('3日'));
+});
+
+test('TEAM.md: 本人が選んだ効いた使い方と、5段階の位置を載せる', () => {
+  const a = { ...member('中村', 'n', 1), share: { ...shareOf(), tips: ['資料と台本を一緒に渡す'] }, phase: '試す', outcome: { made: [], monthlySavedHours: 0 } };
+  const md = renderTeamMd([a]);
+  assert.ok(md.includes('資料と台本を一緒に渡す'));
+  assert.ok(md.includes('いまの位置: 試す'));
+});
+
+test('parseShare: tips は文字列だけを5件まで', () => {
+  const s = parseShare(JSON.stringify({ share: true, tips: ['a', 1, 'b', 'c', 'd', 'e', 'f'] }));
+  assert.deepEqual(s.tips, ['a', 'b', 'c', 'd', 'e']);
+  assert.deepEqual(parseShare('{"share":true}').tips, []);
+});
+
+test('チームから外す対象: どちらもやめた人だけで、未回答や失敗や運営者は外さない', () => {
+  const list = [
+    { github: 'quit', share: shareOf({ share: false, project: false }) },
+    { github: 'keep', share: shareOf({ share: false, project: true }) },
+    { github: 'none', share: null },
+    { github: 'fail', share: null, failed: true },
+    { github: 'owner', share: shareOf({ share: false, project: false }) },
+    { github: 'gone', share: shareOf({ share: false, project: false }) },
+  ];
+  assert.deepEqual(teamRemoveTargets(list, ['QUIT', 'keep', 'none', 'fail', 'owner'], 'owner').map((m) => m.github), ['quit']);
+});
+
+test('運営のページには活用日数を示す', () => {
+  const a = { ...member('中村', 'n', 1), outcome: { made: [], monthlySavedHours: 0 }, activity: { weekDays: 4, monthDays: 9 }, phase: '試す' };
+  const html = renderPage([a]);
+  assert.ok(html.includes('週 4日'));
+  assert.ok(html.includes('試す'));
 });
