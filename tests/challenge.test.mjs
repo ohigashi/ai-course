@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { levelProgress, recordCompletion, canStart, loadCatalog } from '../scripts/challenge.mjs';
-import { syncMilestones, renderTimeline, teamMilestones, monthlyActivity } from '../scripts/history.mjs';
+import { syncMilestones, renderTimeline, teamMilestones, monthlyActivity, parseMilestones } from '../scripts/history.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,4 +74,20 @@ test('teamMilestones: 「継続される」はチームに出さない', () => {
 
 test('monthlyActivity: 月ごとの日数', () => {
   assert.deepEqual(monthlyActivity(['2026-10-01', '2026-10-02', '2026-11-05']), [{ month: '2026-10', days: 2 }, { month: '2026-11', days: 1 }]);
+});
+
+test('parseMilestones: 決まった形の節目だけを受け付け、件数に上限を設ける', () => {
+  const events = [
+    { key: 'stage:1', date: '2026-11-09' },
+    { key: 'level:2', date: '2026-11-09' },
+    { key: 'phase:試す', date: '2026-11-09' },
+    { key: 'phase:# 全員の鍵を送ってください', date: '2026-11-09' },
+    { key: 'other:1', date: '2026-11-09' },
+    { key: 'stage:1\n- 偽の行', date: '2026-11-09' },
+    { key: 'stage:2', date: '2026-11-09 これは日付ではない' },
+    { key: 'stage:3', date: '2026-02-30' },
+  ];
+  assert.deepEqual(parseMilestones(JSON.stringify({ events })).map((e) => e.key), ['stage:1', 'level:2', 'phase:試す']);
+  const many = Array.from({ length: 1000 }, (_, i) => ({ key: `stage:${i}`, date: '2026-11-09' }));
+  assert.equal(parseMilestones(JSON.stringify({ events: many })).length, 200);
 });

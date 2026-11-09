@@ -4,17 +4,22 @@ import { dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createEnv, evaluate, loadRules } from './check.mjs';
 import { levelProgress, loadCatalog, parseCompleted } from './challenge.mjs';
-import { parseActivity, todayString } from './activity.mjs';
+import { isRealDate, parseActivity, PHASES, todayString } from './activity.mjs';
 import { loadRoadmap } from './roadmap.mjs';
 
 const MILESTONES_FILE = 'milestones.json';
 const HIDDEN_FROM_TEAM = 'phase:継続される';
 
+const MAX_EVENTS = 200;
+const isValidKey = (key) => typeof key === 'string'
+  && (/^(stage|level):\d{1,3}$/.test(key) || (key.startsWith('phase:') && PHASES.includes(key.slice('phase:'.length))));
+
+// 他の人にも見える一覧に載るので、決まった形の節目だけを受け付ける。
 export function parseMilestones(text) {
   if (text === null) return [];
   try {
     const events = JSON.parse(text)?.events;
-    return Array.isArray(events) ? events.filter((e) => typeof e?.key === 'string' && typeof e?.date === 'string') : [];
+    return Array.isArray(events) ? events.filter((e) => isValidKey(e?.key) && isRealDate(e?.date)).slice(-MAX_EVENTS) : [];
   } catch {
     return [];
   }

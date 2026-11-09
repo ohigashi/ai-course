@@ -10,7 +10,7 @@ export const todayString = (now = new Date()) => `${now.getFullYear()}-${pad(now
 
 export const recordDay = (days, today) => [...new Set([...days, today])].sort();
 
-const isRealDate = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)
+export const isRealDate = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)
   && !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().startsWith(d);
 
 export function parseActivity(text) {
