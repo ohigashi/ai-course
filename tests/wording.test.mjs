@@ -110,3 +110,10 @@ test('/goal は自己評価を合計や平均にせず、本人だけに残す�
   const t = read('.claude/skills/goal/SKILL.md');
   assert.ok(t.includes('合計しない') && t.includes('誰にも見えない') && t.includes('顧客名'));
 });
+
+test('/goal は自己評価の値を共有される文に書かず、Remote では止まる', () => {
+  const t = read('.claude/skills/goal/SKILL.md');
+  assert.ok(t.includes('自己評価の値を、`docs/goals.md`、`work.mjs next` の文、commit メッセージに書かない'));
+  assert.ok(t.includes('node scripts/where.mjs'));
+  assert.ok(t.includes('まとめて1回の'));
+});

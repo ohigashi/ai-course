@@ -41,3 +41,9 @@ test('renderRatings: 前回の値と並べ、答えていない項目は空', ()
 test('renderRatings: 記録が無ければ目安を案内する', () => {
   assert.ok(renderRatings([], A).includes('1 やったことがない'));
 });
+
+test('addRating: 同じ日に1項目だけ付け直すと、ほかの項目は残る', () => {
+  const a = addRating([], { prompt: 3, github: 5, data: 2 }, '2026-11-11', A);
+  const b = addRating(a, { github: 6 }, '2026-11-11', A);
+  assert.deepEqual(b, [{ date: '2026-11-11', values: { prompt: 3, github: 6, data: 2 } }]);
+});

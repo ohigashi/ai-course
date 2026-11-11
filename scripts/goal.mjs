@@ -29,14 +29,15 @@ export function parseRatings(text, abilities = loadAbilities()) {
     .filter((e) => Object.keys(e.values).length > 0);
 }
 
-// 同じ日に付け直したら、その日の記録を後の値で置き換える。
+// 同じ日に付け直したら、その日の記録に項目ごとに重ねる(付け直した項目だけ後の値になる)。
 export function addRating(log, values, today, abilities = loadAbilities()) {
   const ids = abilities.items.map((i) => i.id);
   const entries = Object.entries(values ?? {});
   if (entries.length === 0) throw new Error('自己評価が1つもありません。項目=値 の形で1つ以上入力してください。');
   const bad = entries.filter(([id, n]) => !ids.includes(id) || !isScore(n)).map(([id, n]) => `${id}=${n}`);
   if (bad.length) throw new Error(`記録できない値があります: ${bad.join(' ')}。項目は ${ids.join(' ')}、値は 1 から 10 の整数です。`);
-  return [...log.filter((e) => e.date !== today), { date: today, values: Object.fromEntries(entries) }].sort((a, b) => a.date.localeCompare(b.date));
+  const earlier = log.find((e) => e.date === today)?.values ?? {};
+  return [...log.filter((e) => e.date !== today), { date: today, values: { ...earlier, ...Object.fromEntries(entries) } }].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export function renderRatings(log, abilities = loadAbilities()) {
