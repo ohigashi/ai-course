@@ -60,10 +60,16 @@ test('発展コースに時期の条件の列がない', () => {
   assert.ok(!read('course/stepups/index.md').includes('始められる時期'));
 });
 
-test('changelog に複数の取り組みの項目があり、先頭は Web の項目', () => {
+test('changelog の先頭は目標の項目で、Web と複数の取り組みの項目も残る', () => {
   const headings = read('course/changelog.md').split('\n').filter((l) => l.startsWith('## '));
-  assert.ok(headings[0].includes('Webで見られるようになりました'));
+  assert.ok(headings[0].includes('目標を書いて、見直せるようになりました'));
+  assert.ok(headings.some((l) => l.includes('Webで見られるようになりました')));
   assert.ok(headings.some((l) => l.includes('複数の取り組みを進められるようになりました')));
+});
+
+test('changelog の Web の更新時刻は、定期ジョブの時刻と合っている', () => {
+  const t = read('course/changelog.md');
+  assert.ok(t.includes('毎日12時、18時、23時ごろ') && !t.includes('およそ1時間ごと'));
 });
 
 test('課題の洗い出しを終えることを条件にする文がない', () => {
