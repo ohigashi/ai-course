@@ -5,7 +5,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const FILES = ['README.md', ...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => `course/stage-${n}.md`), 'course/stepups/index.md', 'course/rules.json', '.claude/skills/next/SKILL.md', '.claude/skills/challenge/SKILL.md', '.claude/skills/course-status/SKILL.md', '.claude/skills/work/SKILL.md'];
+const FILES = ['README.md', ...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => `course/stage-${n}.md`), 'course/stepups/index.md', 'course/rules.json', '.claude/skills/next/SKILL.md', '.claude/skills/challenge/SKILL.md', '.claude/skills/course-status/SKILL.md', '.claude/skills/work/SKILL.md', '.claude/skills/goal/SKILL.md'];
 
 test('受講者に見える文に「段階」を使わない', () => {
   for (const f of FILES) assert.ok(!readFileSync(join(root, f), 'utf8').replaceAll('二段階', '').includes('段階'), f);
@@ -78,4 +78,29 @@ test('/next: 取り組みの場所、redo の提案、月1回の確認、共有�
   for (const key of ['works/<slug>/', 'work.mjs move', '`redo`', 'events.mjs add asked', 'events.mjs add running', '顧客名', '`works.json` が新しく作られる']) assert.ok(t.includes(key), key);
   assert.ok(read('.claude/skills/work/SKILL.md').includes('works/<slug>/'));
   assert.ok(read('.claude/skills/log/SKILL.md').includes('events.mjs add delegated'));
+});
+
+test('目標の見直しの文に、説明用の言葉(現在地、目的地など)を使わない', () => {
+  // 更新の記録は配布済みの項目を書き換えないので、いちばん新しい項目だけを見る。
+  const latestChange = read('course/changelog.md').split('\n## ')[1];
+  const texts = { ...Object.fromEntries(['.claude/skills/goal/SKILL.md', '.claude/skills/next/SKILL.md', 'course/abilities.json'].map((f) => [f, read(f)])), changelog: latestChange };
+  for (const [f, text] of Object.entries(texts)) {
+    for (const w of ['現在地', '目的地', '体感', '差分', '立ち位置', '手応え']) assert.ok(!text.includes(w), `${f}: ${w}`);
+  }
+});
+
+test('/next は最初に where.mjs を実行し、月に1回だけ目標の見直しを聞く', () => {
+  const t = read('.claude/skills/next/SKILL.md');
+  assert.ok(t.includes('node scripts/where.mjs') && t.includes('node scripts/events.mjs due review') && t.includes('/goal'));
+});
+
+test('目標の文と自己評価は、大東の一覧と Web に送らない', () => {
+  for (const f of ['scripts/status.mjs', 'scripts/sync.mjs']) {
+    assert.ok(!read(f).includes('goals.md') && !read(f).includes('ratings'), f);
+  }
+});
+
+test('/goal は自己評価を合計や平均にせず、本人だけに残すと伝える', () => {
+  const t = read('.claude/skills/goal/SKILL.md');
+  assert.ok(t.includes('合計しない') && t.includes('誰にも見えない') && t.includes('顧客名'));
 });
