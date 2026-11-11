@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseEvents, addEvent, runningAskDue } from '../scripts/events.mjs';
+import { parseEvents, addEvent, runningAskDue, reviewDue } from '../scripts/events.mjs';
 import { renderTimeline, parseMilestones } from '../scripts/history.mjs';
 import { loadRoadmap } from '../scripts/roadmap.mjs';
 import { loadPhases } from '../scripts/phases.mjs';
@@ -100,4 +100,31 @@ test('asked: CLI で記録でき、due が いいえ になる。歩みの表示
   assert.equal(ok.status, 0, ok.stderr);
   assert.equal(spawnSync('node', [CLI, 'due'], { cwd: dir, encoding: 'utf8' }).stdout.trim(), 'いいえ');
   assert.deepEqual(declaredEntries([{ kind: 'asked', date: '2026-11-09' }, { kind: 'running', date: '2026-11-10' }]), [{ key: 'event:running', date: '2026-11-10' }]);
+});
+
+test('review は月に1回で、running/asked と互いに打ち消さない', () => {
+  const a = addEvent([], 'asked', '2026-11-03');
+  const b = addEvent(a, 'review', '2026-11-03');
+  assert.equal(b.length, 2);
+  assert.equal(addEvent(b, 'review', '2026-11-20').length, 2);
+  assert.equal(runningAskDue(b, '2026-11'), false);
+  assert.equal(reviewDue(a, '2026-11'), true);
+  assert.equal(reviewDue(b, '2026-11'), false);
+  assert.equal(reviewDue(b, '2026-12'), true);
+  assert.equal(runningAskDue(addEvent([], 'review', '2026-11-03'), '2026-11'), true);
+});
+
+test('declaredEntries: 見直しを聞いた記録は歩みに出さない', () => {
+  assert.deepEqual(declaredEntries([{ kind: 'review', date: '2026-11-09' }, { kind: 'running', date: '2026-11-10' }]), [{ key: 'event:running', date: '2026-11-10' }]);
+});
+
+test('CLI: due review は見直しの記録だけを見る', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ev-review-'));
+  execFileSync('git', ['init', '-q'], { cwd: dir });
+  const run = (...a) => execFileSync('node', [CLI, ...a], { cwd: dir, encoding: 'utf8' }).trim();
+  run('add', 'asked');
+  assert.equal(run('due', 'review'), 'はい');
+  assert.equal(run('due'), 'いいえ');
+  run('add', 'review');
+  assert.equal(run('due', 'review'), 'いいえ');
 });

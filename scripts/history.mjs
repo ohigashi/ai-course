@@ -68,7 +68,7 @@ export function renderTimeline(events, roadmap, { phases = [], mechanisms = [] }
 }
 
 // 申告の出来事を歩みの表示に合わせる。asked(聞いたが使っていなかった)は月1回の確認を止めるだけの記録で、表示しない。
-export const declaredEntries = (events) => events.filter((e) => e.kind !== 'asked').map((e) => ({ key: `event:${e.kind}`, date: e.date }));
+export const declaredEntries = (events) => events.filter((e) => e.kind !== 'asked' && e.kind !== 'review').map((e) => ({ key: `event:${e.kind}`, date: e.date }));
 
 export const monthEvents = (events, month) => events.filter((e) => e.date.startsWith(month));
 

@@ -1,4 +1,4 @@
-// 本人が申告する出来事(仕事をAIに任せた、作ったものが今月も動いている)。日付だけを .local/events.json に残す(GitHub には上がらない)。
+// 本人が申告する出来事(仕事をAIに任せた、作ったものが今月も動いている)と、目標の見直しを聞いた記録。日付だけを .local/events.json に残す(GitHub には上がらない)。
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,7 +6,12 @@ import { isRealDate, todayString } from './activity.mjs';
 import { ensureLocalExcluded, localDirIsTracked, LOCAL_DIR } from './local-dir.mjs';
 
 const LOG_FILE = join(LOCAL_DIR, 'events.json');
-export const EVENT_KINDS = ['delegated', 'running', 'asked'];
+export const EVENT_KINDS = ['delegated', 'running', 'asked', 'review'];
+
+// 月に1回だけ残すまとまり。「作ったものはまだ使っていますか」と「目標を見直しますか」は互いに打ち消さない。
+const MONTHLY_GROUPS = [['running', 'asked'], ['review']];
+const groupOf = (kind) => MONTHLY_GROUPS.find((g) => g.includes(kind));
+const askedThisMonth = (log, group, month) => log.some((e) => group.includes(e.kind) && e.date.startsWith(month));
 
 export function parseEvents(text) {
   let data;
@@ -15,23 +20,25 @@ export function parseEvents(text) {
   return data.filter((e) => e && EVENT_KINDS.includes(e.kind) && isRealDate(e.date)).map((e) => ({ kind: e.kind, date: e.date }));
 }
 
-// running と asked(聞いたが使っていなかった)は月に1回、delegated は日に1回だけ残す。
+// running と asked(聞いたが使っていなかった)、review(見直しを聞いた)は月に1回、delegated は日に1回だけ残す。
 export function addEvent(log, kind, today) {
   if (!EVENT_KINDS.includes(kind)) throw new Error(`知らない種類です: ${kind}`);
-  const monthly = kind === 'running' || kind === 'asked';
-  if (monthly && log.some((e) => (e.kind === 'running' || e.kind === 'asked') && e.date.slice(0, 7) === today.slice(0, 7))) return log;
-  if (!monthly && log.some((e) => e.kind === kind && e.date === today)) return log;
+  const group = groupOf(kind);
+  if (group && askedThisMonth(log, group, today.slice(0, 7))) return log;
+  if (!group && log.some((e) => e.kind === kind && e.date === today)) return log;
   return [...log, { kind, date: today }];
 }
 
-export const runningAskDue = (log, month) => !log.some((e) => (e.kind === 'running' || e.kind === 'asked') && e.date.startsWith(month));
+export const runningAskDue = (log, month) => !askedThisMonth(log, groupOf('running'), month);
+export const reviewDue = (log, month) => !askedThisMonth(log, groupOf('review'), month);
 
 const readLog = () => parseEvents(existsSync(LOG_FILE) ? readFileSync(LOG_FILE, 'utf8') : null);
 
 function main(args) {
   const [cmd, kind] = args;
   if (cmd === 'due') {
-    console.log(runningAskDue(readLog(), todayString().slice(0, 7)) ? 'はい' : 'いいえ');
+    const due = kind === 'review' ? reviewDue : runningAskDue;
+    console.log(due(readLog(), todayString().slice(0, 7)) ? 'はい' : 'いいえ');
     return 0;
   }
   if (cmd === 'add' && EVENT_KINDS.includes(kind)) {
@@ -45,7 +52,7 @@ function main(args) {
     console.log(`出来事を記録しました。この記録はこのパソコンの ${LOCAL_DIR}/ にだけ残り、誰にも見えません。別のパソコンには引き継がれません。`);
     return 0;
   }
-  console.log('使い方: node scripts/events.mjs add delegated|running|asked | due');
+  console.log('使い方: node scripts/events.mjs add delegated|running|asked|review | due [review]');
   return 1;
 }
 
